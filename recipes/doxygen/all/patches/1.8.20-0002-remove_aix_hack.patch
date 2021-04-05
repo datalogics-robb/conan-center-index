@@ -1,0 +1,28 @@
+--- qtools/qglobal.h
++++ qtools/qglobal.h
+@@ -357,7 +357,8 @@
+ typedef __int64            int64;
+ typedef unsigned __int64   uint64;
+ #else
+-#if !defined(_OS_AIX_) || !defined(_H_INTTYPES)
++#include <inttypes.h>
++#if !defined(_H_INTTYPES)
+ typedef long long          int64;
+ #endif
+ typedef unsigned long long uint64;
+--- libmscgen/mscgen_bool.h
++++ libmscgen/mscgen_bool.h
+@@ -23,6 +23,13 @@
+ #ifndef MSCGEN_BOOL_H
+ #define MSCGEN_BOOL_H
+ 
++#if defined(FALSE)
++#undef FALSE
++#endif
++#if defined(TRUE)
++#undef TRUE
++#endif
++
+ typedef enum
+ {
+     FALSE = 0,

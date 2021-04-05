@@ -39,6 +39,7 @@ class DoxygenConan(ConanFile):
     def requirements(self):
         self.requires("xapian-core/1.4.16")
         self.requires("zlib/1.2.11")
+        self.requires("libiconv/1.16")
 
     def build_requirements(self):
         if tools.os_info.is_windows:

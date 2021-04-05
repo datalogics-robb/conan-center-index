@@ -12,6 +12,8 @@ patches:
   "1.8.20":
     - patch_file: "patches/1.8.20-0001-relocatable-cmake.patch"
       base_path: "source_subfolder"
+    - patch_file: "patches/1.8.20-0002-remove_aix_hack.patch"
+      base_path: "source_subfolder"
   "1.8.18":
     - patch_file: "patches/1.8.18-0001-relocatable-cmake.patch"
       base_path: "source_subfolder"
