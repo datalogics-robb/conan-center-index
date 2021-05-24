@@ -40,8 +40,13 @@ class SwigConan(ConanFile):
         del self.info.settings.compiler
 
     def source(self):
-        tools.get(**self.conan_data["sources"][self.version],
-                  destination=self._source_subfolder, strip_root=True)
+        source = self.conan_data['sources'][self.version]
+        if 'git' in source:
+            git = tools.Git(folder=self._source_subfolder)
+            git.clone(**source['git'])
+        else:
+            tools.get(**source,
+                      destination=self._source_subfolder, strip_root=True)
 
     @property
     def _user_info_build(self):
