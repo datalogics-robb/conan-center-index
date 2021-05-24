@@ -14,7 +14,7 @@ class SwigConan(ConanFile):
     license = "GPL-3.0-or-later"
     topics = ("swig", "python", "java", "wrapper")
     exports_sources = "patches/**", "cmake/*"
-    settings = "os", "arch", "compiler", "build_type"
+    settings = "os", "arch", "compiler", "build_type", "os_build", "arch_build"
 
     @property
     def _source_subfolder(self):
@@ -159,3 +159,17 @@ class SwigConan(ConanFile):
         bindir = os.path.join(self.package_folder, "bin")
         self.output.info("Appending PATH environment variable: {}".format(bindir))
         self.env_info.PATH.append(bindir)
+
+    def package_id(self):
+        del self.info.settings.compiler
+        del self.info.settings.os_build
+        del self.info.settings.arch_build
+
+        # Doxygen doesn't make executable code. Any package that will run is ok to use.
+        # It's ok in general to use a release version of the tool that matches the
+        # build os and architecture.
+        compatible_pkg = self.info.clone()
+        compatible_pkg.settings.build_type = 'Release'
+        compatible_pkg.settings.arch = self.settings.arch_build
+        compatible_pkg.settings.os = self.settings.os_build
+        self.compatible_packages.append(compatible_pkg)
