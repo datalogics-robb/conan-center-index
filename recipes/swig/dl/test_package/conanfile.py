@@ -7,6 +7,10 @@ class TestPackageConan(ConanFile):
 
     @property
     def _can_build(self):
+        if self.deps_cpp_info['swig'].version < tools.Version('4.0.0'):
+            # SWIG is old and might not be able to build code for a modern Python (say, Python 3)
+            return False
+
         # FIXME: Python does not distribute debug libraries (use cci CPython recipe)
         return not (self.settings.compiler == "Visual Studio" and self.settings.build_type == "Debug")
 
