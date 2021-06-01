@@ -1,0 +1,13 @@
+diff --git a/Makefile.in b/Makefile.in
+index 7b6cb1a..d58821a 100644
+--- a/Makefile.in
++++ b/Makefile.in-new
+@@ -484,7 +484,7 @@ PDL_LDFLAGS_SO=@PDL_DYNAMIC_LDFLAGS@
+ # Solaris may need -lnsl -lsocket -lposix4.
+ # (Libraries required by individual drivers are handled automatically.)
+ 
+-EXTRALIBS=$(XTRALIBS) @LIBS@ @DYNAMIC_LIBS@ @FONTCONFIG_LIBS@ @FT_LIBS@ @JPX_AUTOCONF_LIBS@ @EXPAT_LIBS@
++EXTRALIBS=$(XTRALIBS) $(LDFLAGS) @LIBS@ @DYNAMIC_LIBS@ @FONTCONFIG_LIBS@ @FT_LIBS@ @JPX_AUTOCONF_LIBS@ @EXPAT_LIBS@
+ AUXEXTRALIBS=@AUXEXTRALIBS@ @AUX_SHARED_ZLIB@
+ 
+ # Define the standard libraries to search at the end of linking.

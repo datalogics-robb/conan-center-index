@@ -1,0 +1,8 @@
+sources:
+  "9.54.0":
+    url: "https://github.com/ArtifexSoftware/ghostpdl-downloads/releases/download/gs9540/ghostscript-9.54.0.tar.gz"
+    sha256: "0646bb97f6f4d10a763f4919c54fa28b4fbdd3dff8e7de3410431c81762cade0"
+patches:
+  "9.54.0":
+    - patch_file: "patches/0001-add_LDFLAAGS_to_EXTRA_LIBS.patch"
+      base_path: "source_subfolder"
