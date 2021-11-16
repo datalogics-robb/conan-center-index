@@ -1,0 +1,6 @@
+tox
+dl-conan-build-tools~=3.4
+coverage
+flake8
+pipdeptree
+certifi

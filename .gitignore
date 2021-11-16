@@ -433,6 +433,7 @@ tmp/
 
 # Environments
 python-env-*
+requirements.txt
 
 # scons build files
 *.dblite
