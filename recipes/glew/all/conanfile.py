@@ -2,7 +2,7 @@ import os
 import glob
 from conans import ConanFile, CMake, tools
 
-required_conan_version = ">=1.28.0"
+required_conan_version = ">=1.36.0"
 
 class GlewConan(ConanFile):
     name = "glew"
@@ -17,10 +17,12 @@ class GlewConan(ConanFile):
     options = {
         "shared": [True, False],
         "fPIC": [True, False],
+        "with_egl": [True, False]
     }
     default_options = {
         "shared": False,
         "fPIC": True,
+        "with_egl": False
     }
 
     _cmake = None
@@ -36,6 +38,7 @@ class GlewConan(ConanFile):
     def config_options(self):
         if self.settings.os == "Windows":
             del self.options.fPIC
+            del self.options.with_egl
 
     def configure(self):
         if self.options.shared:
@@ -55,7 +58,8 @@ class GlewConan(ConanFile):
         if self._cmake:
             return self._cmake
         self._cmake = CMake(self)
-        self._cmake.definitions["BUILD_UTILS"] = "OFF"
+        self._cmake.definitions["BUILD_UTILS"] = False
+        self._cmake.definitions["GLEW_EGL"] = self.options.get_safe("with_egl", False)
         self._cmake.configure(build_folder=self._build_subfolder)
         return self._cmake
 
@@ -77,12 +81,12 @@ class GlewConan(ConanFile):
         self.copy(pattern="LICENSE.txt", dst="licenses", src=self._source_subfolder)
 
     def package_info(self):
-        self.cpp_info.filenames["cmake_find_package"] = "GLEW"
-        self.cpp_info.filenames["cmake_find_package_multi"] = "glew"
-        self.cpp_info.names["cmake_find_package"] = "GLEW"
-        self.cpp_info.names["cmake_find_package_multi"] = "GLEW"
-        self.cpp_info.components["glewlib"].names["cmake_find_package"] = "GLEW"
-        self.cpp_info.components["glewlib"].names["cmake_find_package_multi"] = "glew" if self.options.shared else "glew_s"
+        self.cpp_info.set_property("cmake_file_name", "GLEW", "cmake_find_package")
+        self.cpp_info.set_property("cmake_file_name", "glew", "cmake_find_package_multi")
+        self.cpp_info.set_property("cmake_target_name", "GLEW")
+        self.cpp_info.components["glewlib"].set_property("cmake_target_name", "GLEW", "cmake_find_package")
+        glewlib_target_name = "glew" if self.options.shared else "glew_s"
+        self.cpp_info.components["glewlib"].set_property("cmake_target_name", glewlib_target_name)
         self.cpp_info.components["glewlib"].libs = tools.collect_libs(self)
         if self.settings.os == "Windows" and not self.options.shared:
             self.cpp_info.components["glewlib"].defines.append("GLEW_STATIC")

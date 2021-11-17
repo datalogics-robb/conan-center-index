@@ -5,3 +5,14 @@ sources:
   "4.4.0":
     url: "https://github.com/emweb/wt/archive/4.4.0.tar.gz"
     sha256: "2eabefea915ecc4deb36f9f67ab30dd3b1f6c73893d76c9d9fa39ac25f4f3690"
+  "4.5.0":
+    url: "https://github.com/emweb/wt/archive/4.5.0.tar.gz"
+    sha256: "119b1eae83285a153b9c901d3f4f25775c7a460d30b1e48242d7d2d649d61deb"
+  "4.5.1":
+    url: "https://github.com/emweb/wt/archive/4.5.1.tar.gz"
+    sha256: "c2820646095af5618fc235705c0108797e3898225fb1826f2c6185c405c21a17"
+
+patches:
+    "4.5.0":
+      - patch_file: "patches/wt_4_5_0_gcc_11.patch"
+        base_path: "source_subfolder"

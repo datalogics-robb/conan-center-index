@@ -1,6 +1,7 @@
 from conans import ConanFile, CMake, tools
 import os
 
+required_conan_version = ">=1.33.0"
 
 class VolkConan(ConanFile):
     name = "volk"
@@ -40,13 +41,12 @@ class VolkConan(ConanFile):
         del self.settings.compiler.cppstd
         del self.settings.compiler.libcxx
 
-    def requirements(self):      
+    def requirements(self):
         self.requires("vulkan-headers/" + self.version)
 
     def source(self):
-        tools.get(**self.conan_data["sources"][self.version])
-        commithash, _ = os.path.splitext(os.path.basename(self.conan_data["sources"][self.version]["url"]))
-        os.rename("volk-{}".format(commithash), self._source_subfolder)
+        tools.get(**self.conan_data["sources"][self.version],
+                  destination=self._source_subfolder, strip_root=True)
 
     def _configure_cmake(self):
         if self._cmake:
@@ -67,6 +67,19 @@ class VolkConan(ConanFile):
         tools.rmdir(os.path.join(self.package_folder, "lib", "cmake"))
 
     def package_info(self):
-        self.cpp_info.libs = ["volk"]
+        self.cpp_info.names["cmake_find_package"] = "volk"
+        self.cpp_info.names["cmake_find_package_multi"] = "volk"
+
+        self.cpp_info.components["libvolk"].names["cmake_find_package"] = "volk"
+        self.cpp_info.components["libvolk"].names["cmake_find_package_multi"] = "volk"
+        self.cpp_info.components["libvolk"].libs = ["volk"]
+        self.cpp_info.components["libvolk"].requires = ["vulkan-headers::vulkan-headers"]
         if self.settings.os == "Linux":
-            self.cpp_info.system_libs = ["dl"]
+            self.cpp_info.components["libvolk"].system_libs = ["dl"]
+
+        self.cpp_info.components["volk_headers"].names["cmake_find_package"] = "volk_headers"
+        self.cpp_info.components["volk_headers"].names["cmake_find_package_multi"] = "volk_headers"
+        self.cpp_info.components["volk_headers"].libs = []
+        self.cpp_info.components["volk_headers"].requires = ["vulkan-headers::vulkan-headers"]
+        if self.settings.os == "Linux":
+            self.cpp_info.components["volk_headers"].system_libs = ["dl"]

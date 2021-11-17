@@ -1,14 +1,10 @@
-cmake_minimum_required(VERSION 2.8.12)
-project(PackageTest CXX)
+cmake_minimum_required(VERSION 3.1)
+project(test_package C)
 
 include(${CMAKE_BINARY_DIR}/conanbuildinfo.cmake)
-conan_basic_setup()
+conan_basic_setup(TARGETS)
 
-add_executable(example example.cpp)
-target_link_libraries(example ${CONAN_LIBS})
+find_package(libgd CONFIG REQUIRED)
 
-# CTest is a testing tool that can be used to test your project.
-# enable_testing()
-# add_test(NAME example
-#          WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/bin
-#          COMMAND example)
+add_executable(${PROJECT_NAME} test_package.c)
+target_link_libraries(${PROJECT_NAME} PRIVATE libgd::libgd)

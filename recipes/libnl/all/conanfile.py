@@ -1,6 +1,9 @@
-import os, glob
 from conans import ConanFile, tools, AutoToolsBuildEnvironment
 from conans.errors import ConanInvalidConfiguration
+import os
+
+required_conan_version = ">=1.33.0"
+
 
 class LibNlConan(ConanFile):
     name = "libnl"
@@ -21,13 +24,12 @@ class LibNlConan(ConanFile):
         return "source_subfolder"
 
     def source(self):
-        tools.get(**self.conan_data["sources"][self.version])
-        extracted_dir = self.name + "-" + self.version
-        os.rename(extracted_dir, self._source_subfolder)
+        tools.get(**self.conan_data["sources"][self.version], destination=self._source_subfolder, strip_root=True)
 
     def configure(self):
         if self.settings.os != "Linux":
             raise ConanInvalidConfiguration("Libnl is only supported on Linux")
+
         if self.options.shared:
             del self.options.fPIC
         del self.settings.compiler.libcxx
@@ -56,17 +58,23 @@ class LibNlConan(ConanFile):
         autotools = self._configure_autotools()
         autotools.install()
         self.copy("COPYING", dst="licenses", src=self._source_subfolder)
-        #tools.remove_files_by_mask causes AttributeError: module 'conans.tools' has no attribute 'remove_files_by_mask'
-        #tools.remove_files_by_mask(os.path.join(self.package_folder, "lib"), "*.la")
-        la_pattern = os.path.join(self.package_folder, "lib", "**", "*.la")
-        la_files = glob.glob(la_pattern, recursive=True)
-        for next_file in la_files:
-            os.remove(next_file)
+        tools.remove_files_by_mask(os.path.join(self.package_folder, "lib"), "*.la")
         tools.rmdir(os.path.join(self.package_folder, "share"))
         tools.rmdir(os.path.join(self.package_folder, "etc"))
         tools.rmdir(os.path.join(self.package_folder, "lib", "pkgconfig"))
 
     def package_info(self):
-        self.cpp_info.includedirs = [os.path.join('include', 'libnl3')]
-        self.cpp_info.libs = ["nl-3", "nl-cli-3", "nl-genl-3", "nl-idiag-3", "nl-nf-3", "nl-route-3"]
-        self.cpp_info.system_libs = ["pthread", "m"]
+        self.cpp_info.components["nl"].libs = ["nl-3"]
+        self.cpp_info.components["nl"].includedirs = [os.path.join('include', 'libnl3')]
+        if not tools.os_info.is_windows:
+            self.cpp_info.components["nl"].system_libs = ["pthread", "m"]
+        self.cpp_info.components["nl-route"].libs = ["nl-route-3"]
+        self.cpp_info.components["nl-route"].requires = ["nl"]
+        self.cpp_info.components["nl-genl"].libs = ["nl-genl-3"]
+        self.cpp_info.components["nl-genl"].requires = ["nl"]
+        self.cpp_info.components["nl-nf"].libs = ["nl-nf-3"]
+        self.cpp_info.components["nl-nf"].requires = ["nl-route"]
+        self.cpp_info.components["nl-cli"].libs = ["nl-cli-3"]
+        self.cpp_info.components["nl-cli"].requires = ["nl-nf", "nl-genl"]
+        self.cpp_info.components["nl-idiag"].libs = ["nl-idiag-3"]
+        self.cpp_info.components["nl-idiag"].requires = ["nl"]

@@ -1,7 +1,7 @@
 import os
 import re
 from conans import AutoToolsBuildEnvironment, ConanFile, CMake, tools
-from conans.errors import ConanException
+from conans.errors import ConanException, ConanInvalidConfiguration
 
 
 class AprConan(ConanFile):
@@ -46,6 +46,14 @@ class AprConan(ConanFile):
     def _build_subfolder(self):
         return "build_subfolder"
 
+    def validate(self):
+        if hasattr(self, "settings_build") and tools.cross_building(self):
+            raise ConanInvalidConfiguration("apr cannot be cross compiled due to runtime checks")
+
+    def build_requirements(self):
+        if self.settings.os == "Macos":
+            self.build_requires("libtool/2.4.6")
+
     def source(self):
         tools.get(**self.conan_data["sources"][self.version])
         os.rename("{}-{}".format(self.name, self.version), self._source_subfolder)
@@ -62,15 +70,25 @@ class AprConan(ConanFile):
     def _configure_autotools(self):
         if self._autotools:
             return self._autotools
+        if (self.settings.compiler == "apple-clang" and
+            tools.Version(self.settings.compiler.version) == "12" and
+            self.version == "1.7.0"):
+
+            with tools.chdir( self._source_subfolder ):
+                os.remove( "configure" )
+                self.run( "./buildconf" )
+
         self._autotools = AutoToolsBuildEnvironment(self)
         self._autotools.libs = []
+        yes_no = lambda v: "yes" if v else "no"
         conf_args = [
             "--with-installbuilddir=${prefix}/bin/build-1",
+            "--enable-shared={}".format(yes_no(self.options.shared)),
+            "--enable-static={}".format(yes_no(not self.options.shared)),
         ]
-        if self.options.shared:
-            conf_args.extend(["--enable-shared", "--disable-static"])
-        else:
-            conf_args.extend(["--disable-shared", "--enable-static"])
+        if tools.cross_building(self.settings):
+            #
+            conf_args.append("apr_cv_mutex_robust_shared=yes")
         self._autotools.configure(args=conf_args, configure_dir=self._source_subfolder)
         return self._autotools
 
@@ -113,7 +131,7 @@ class AprConan(ConanFile):
 
     def package_info(self):
         self.cpp_info.names["pkg_config"] = "apr-1"
-        self.cpp_info.libs = ["apr-1"]
+        self.cpp_info.libs = ["libapr-1" if self.settings.compiler == "Visual Studio" and self.options.shared else "apr-1"]
         if not self.options.shared:
             self.cpp_info.defines = ["APR_DECLARE_STATIC"]
             if self.settings.os == "Linux":
