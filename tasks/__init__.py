@@ -30,23 +30,28 @@ def upload_recipes(ctx, remote='conan-center-dl-staging', package=None, all=Fals
     for pkg in sorted_packages:
         print(f'    {pkg}')
     for one_package in sorted_packages:
-        ctx.run(f'conan remove {one_package} --force')
-        recipe_folder = os.path.join('recipes', one_package)
-        config_yml_file = os.path.join(recipe_folder, 'config.yml')
-        if os.path.exists(config_yml_file):
-            with open(config_yml_file, 'r') as config_yml:
-                config_data = yaml.safe_load(config_yml)
-                for version, config in config_data['versions'].items():
-                    folder = os.path.join(recipe_folder, config['folder'])
-                    ctx.run(f'conan export {folder} {one_package}/{version}@')
-        else:
-            with os.scandir(recipe_folder) as dirs:
-                for entry in dirs:
-                    if not entry.name.startswith('.') and entry.is_dir():
-                        version = entry.name
-                        folder = os.path.join(recipe_folder, version)
-                        ctx.run(f'conan export {folder} {one_package}/{version}@')
-        ctx.run(f'conan upload -r {remote} {one_package} --confirm')
+        upload_one_package_name(ctx, one_package, remote)
+
+
+def upload_one_package_name(ctx, package_name, remote):
+    """Upload one recipe to the given remote"""
+    ctx.run(f'conan remove {package_name} --force')
+    recipe_folder = os.path.join('recipes', package_name)
+    config_yml_file = os.path.join(recipe_folder, 'config.yml')
+    if os.path.exists(config_yml_file):
+        with open(config_yml_file, 'r') as config_yml:
+            config_data = yaml.safe_load(config_yml)
+            for version, config in config_data['versions'].items():
+                folder = os.path.join(recipe_folder, config['folder'])
+                ctx.run(f'conan export {folder} {package_name}/{version}@')
+    else:
+        with os.scandir(recipe_folder) as dirs:
+            for entry in dirs:
+                if not entry.name.startswith('.') and entry.is_dir():
+                    version = entry.name
+                    folder = os.path.join(recipe_folder, version)
+                    ctx.run(f'conan export {folder} {package_name}/{version}@')
+    ctx.run(f'conan upload -r {remote} {package_name} --confirm')
 
 
 tasks = []
