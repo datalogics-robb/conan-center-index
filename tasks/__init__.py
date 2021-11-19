@@ -1,10 +1,10 @@
 import io
 import os
 import yaml
+from concurrent import futures
 from dl_conan_build_tools.tasks import conan
-from invoke import Collection
+from invoke import Collection, Exit
 from invoke.tasks import Task, task
-from multiprocessing.pool import ThreadPool
 
 
 @task(help={'remote': 'remote to upload to, default conan-center-dl-staging',
@@ -38,11 +38,23 @@ def upload_recipes(ctx, remote='conan-center-dl-staging', package=None, all=Fals
         upload_one_package_name(ctx, one_package, remote, upload=upload)
 
     if parallel:
-        with ThreadPool() as pool:
-            pool.map(do_upload, sorted_packages)
+        upload_in_parallel(do_upload, sorted_packages)
     else:
         for one_package in sorted_packages:
             do_upload(one_package)
+
+
+def upload_in_parallel(do_upload, sorted_packages, thread_name_prefix=None):
+    """Upload recipes in parallel"""
+    with futures.ThreadPoolExecutor(thread_name_prefix='upload_recipes') as executor:
+        future_to_package = {executor.submit(do_upload, one_package): one_package for one_package in sorted_packages}
+        for future in futures.as_completed(future_to_package):
+            exception = future.exception()
+            if exception:
+                # Fail on first problem
+                executor.shutdown(wait=True, cancel_futures=True)
+                one_package = future_to_package[future]
+                raise Exit(f'error exporting/uploading {one_package}: {exception}') from exception
 
 
 def upload_one_package_name(ctx, package_name, remote, upload=True):
