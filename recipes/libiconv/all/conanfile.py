@@ -2,6 +2,8 @@ from conans import ConanFile, tools, AutoToolsBuildEnvironment
 from contextlib import contextmanager
 import os
 
+required_conan_version = ">=1.33.0"
+
 
 class LibiconvConan(ConanFile):
     name = "libiconv"
@@ -23,16 +25,11 @@ class LibiconvConan(ConanFile):
 
     @property
     def _use_winbash(self):
-        return tools.os_info.is_windows and (self.settings.compiler == "gcc" or tools.cross_building(self.settings))
+        return tools.os_info.is_windows and (self.settings.compiler == "gcc" or tools.cross_building(self))
 
     @property
     def _is_msvc(self):
         return self.settings.compiler == "Visual Studio"
-
-    def build_requirements(self):
-        if tools.os_info.is_windows and "CONAN_BASH_PATH" not in os.environ \
-                and tools.os_info.detect_windows_subsystem() != "msys2":
-            self.build_requires("msys2/20200517")
 
     def config_options(self):
         if self.settings.os == "Windows":
@@ -44,10 +41,16 @@ class LibiconvConan(ConanFile):
         del self.settings.compiler.libcxx
         del self.settings.compiler.cppstd
 
+    @property
+    def _settings_build(self):
+        return getattr(self, "settings_build", self.settings)
+
+    def build_requirements(self):
+        if self._settings_build.os == "Windows" and not tools.get_env("CONAN_BASH_PATH"):
+            self.build_requires("msys2/cci.latest")
+
     def source(self):
-        tools.get(**self.conan_data["sources"][self.version])
-        archive_name = "{0}-{1}".format(self.name, self.version)
-        os.rename(archive_name, self._source_subfolder)
+        tools.get(**self.conan_data["sources"][self.version], destination=self._source_subfolder, strip_root=True)
 
     @contextmanager
     def _build_context(self):
@@ -67,7 +70,7 @@ class LibiconvConan(ConanFile):
             })
             env_vars["win32_target"] = "_WIN32_WINNT_VISTA"
 
-        if not tools.cross_building(self.settings) or self._is_msvc:
+        if not tools.cross_building(self) or self._is_msvc:
             rc = None
             if self.settings.arch == "x86":
                 rc = "windres --target=pe-i386"
@@ -96,13 +99,6 @@ class LibiconvConan(ConanFile):
             elif self.settings.arch == "x86_64":
                 host = "x86_64-w64-mingw32"
 
-        #
-        # If you pass --build when building for iPhoneSimulator, the configure script halts.
-        # So, disable passing --build by setting it to False.
-        #
-        if self.settings.os == "iOS" and self.settings.arch == "x86_64":
-            build = False
-
         self._autotools = AutoToolsBuildEnvironment(self, win_bash=tools.os_info.is_windows)
 
         configure_args = []
@@ -111,7 +107,7 @@ class LibiconvConan(ConanFile):
         else:
             configure_args.extend(["--enable-static", "--disable-shared"])
 
-        if self._is_msvc:
+        if self._is_msvc and tools.Version(self.settings.compiler.version) >= "12":
             self._autotools.flags.append("-FS")
 
         self._autotools.configure(args=configure_args, host=host, build=build)
@@ -133,14 +129,13 @@ class LibiconvConan(ConanFile):
             autotools = self._configure_autotools()
             autotools.install()
 
-        os.unlink(os.path.join(self.package_folder, "lib", "libcharset.la"))
-        os.unlink(os.path.join(self.package_folder, "lib", "libiconv.la"))
+        tools.remove_files_by_mask(os.path.join(self.package_folder, "lib"), "*.la")
         tools.rmdir(os.path.join(self.package_folder, "share"))
 
         if self._is_msvc and self.options.shared:
             for import_lib in ["iconv", "charset"]:
-                os.rename(os.path.join(self.package_folder, "lib", "{}.dll.lib".format(import_lib)),
-                          os.path.join(self.package_folder, "lib", "{}.lib".format(import_lib)))
+                tools.rename(os.path.join(self.package_folder, "lib", "{}.dll.lib".format(import_lib)),
+                             os.path.join(self.package_folder, "lib", "{}.lib".format(import_lib)))
 
     def package_info(self):
         self.cpp_info.names["cmake_find_package"] = "Iconv"

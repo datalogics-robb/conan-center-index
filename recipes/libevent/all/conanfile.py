@@ -1,25 +1,29 @@
 from conans import ConanFile, CMake, tools
 import os
 
-required_conan_version = ">=1.28.0"
+required_conan_version = ">=1.33.0"
 
 class LibeventConan(ConanFile):
     name = "libevent"
     description = "libevent - an event notification library"
-    topics = ("conan", "libevent", "event")
+    topics = ("event", "notification", "networking", "async")
     url = "https://github.com/conan-io/conan-center-index"
     homepage = "https://github.com/libevent/libevent"
     license = "BSD-3-Clause"
     exports_sources = ["CMakeLists.txt", "patches/**"]
     settings = "os", "compiler", "build_type", "arch"
-    options = {"shared": [True, False],
-               "fPIC": [True, False],
-               "with_openssl": [True, False],
-               "disable_threads": [True, False]}
-    default_options = {"shared": False,
-                       "fPIC": True,
-                       "with_openssl": True,
-                       "disable_threads": False}
+    options = {
+        "shared": [True, False],
+        "fPIC": [True, False],
+        "with_openssl": [True, False],
+        "disable_threads": [True, False]
+    }
+    default_options = {
+        "shared": False,
+        "fPIC": True,
+        "with_openssl": True,
+        "disable_threads": False
+    }
     generators = "cmake", "cmake_find_package"
     short_paths = True
 
@@ -45,14 +49,10 @@ class LibeventConan(ConanFile):
 
     def requirements(self):
         if self.options.with_openssl:
-            self.requires("openssl/1.1.1g")
+            self.requires("openssl/1.1.1l")
 
     def source(self):
-        tools.get(**self.conan_data["sources"][self.version])
-        # temporary fix due to missing files in dist package for 2.1.11, see upstream bug 863
-        # for other versions "libevent-{0}-stable".format(self.version) is enough
-        extracted_folder = "libevent-release-{0}-stable".format(self.version)
-        os.rename(extracted_folder, self._source_subfolder)
+        tools.get(**self.conan_data["sources"][self.version], destination=self._source_subfolder, strip_root=True)
 
     def _configure_cmake(self):
         if self._cmake:

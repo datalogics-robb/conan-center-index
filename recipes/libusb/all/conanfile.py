@@ -1,5 +1,10 @@
 from conans import ConanFile, AutoToolsBuildEnvironment, MSBuild, tools
+from conans.errors import ConanInvalidConfiguration
 import os
+import re
+
+required_conan_version = ">=1.33.0"
+
 
 class LibUSBConan(ConanFile):
     name = "libusb"
@@ -9,8 +14,16 @@ class LibUSBConan(ConanFile):
     url = "https://github.com/conan-io/conan-center-index"
     topics = ("conan", "libusb", "usb", "device")
     settings = "os", "compiler", "build_type", "arch"
-    options = {"shared": [True, False], "enable_udev": [True, False], "fPIC": [True, False]}
-    default_options = {"shared": False, "enable_udev": True, "fPIC": True}
+    options = {
+        "shared": [True, False],
+        "fPIC": [True, False],
+        "enable_udev": [True, False],
+    }
+    default_options = {
+        "shared": False,
+        "fPIC": True,
+        "enable_udev": True,
+    }
     _autotools = None
 
     @property
@@ -25,28 +38,38 @@ class LibUSBConan(ConanFile):
     def _is_msvc(self):
         return self.settings.os == "Windows" and self.settings.compiler == "Visual Studio"
 
-    def source(self):
-        tools.get(**self.conan_data["sources"][self.version])
-        extracted_folder = self.name + "-" + self.version
-        os.rename(extracted_folder, self._source_subfolder)
+    @property
+    def _settings_build(self):
+        return self.settings_build if hasattr(self, "settings_build") else self.settings
+
+    def config_options(self):
+        if self.settings.os == "Windows":
+            del self.options.fPIC
+        if self.settings.os not in ["Linux", "Android"]:
+            del self.options.enable_udev
+        # FIXME: enable_udev should be True for Android, but libudev recipe is missing
+        if self.settings.os == "Android":
+            self.options.enable_udev = False
 
     def configure(self):
+        if self.options.shared:
+            del self.options.fPIC
         del self.settings.compiler.libcxx
         del self.settings.compiler.cppstd
 
-    def config_options(self):
-        if self.settings.os != "Linux":
-            del self.options.enable_udev
-        if self.settings.os == "Windows":
-            del self.options.fPIC
+    def validate(self):
+        if self.options.get_safe("enable_udev"):
+            if self.settings.os == "Android":
+                raise ConanInvalidConfiguration("udev can't be enabled for Android yet, since libudev recipe is missing in CCI.")
+            if self.settings.os == "Linux" and self._settings_build.os != "Linux":
+                raise ConanInvalidConfiguration("udev can't be enabled yet if cross-compiling to Linux from a non-Linux machine")
 
     def build_requirements(self):
-        if tools.os_info.is_windows and "CONAN_BASH_PATH" not in os.environ and \
-                tools.os_info.detect_windows_subsystem() != "msys2":
-            self.build_requires("msys2/20190524")
+        if self._settings_build.os == "Windows" and not self._is_msvc and not tools.get_env("CONAN_BASH_PATH"):
+            self.build_requires("msys2/cci.latest")
 
     def system_requirements(self):
-        if self.settings.os == "Linux":
+        if self._settings_build.os == "Linux" and self.settings.os == "Linux":
             if self.options.enable_udev:
                 package_tool = tools.SystemPackageTool(conanfile=self)
                 libudev_name = ""
@@ -64,26 +87,39 @@ class LibUSBConan(ConanFile):
                     return
                 package_tool.install(packages=libudev_name, update=True)
 
+    def source(self):
+        tools.get(**self.conan_data["sources"][self.version],
+                  destination=self._source_subfolder, strip_root=True)
+
     def _build_visual_studio(self):
         with tools.chdir(self._source_subfolder):
-            solution_file = "libusb_2017.sln"
-            if self.settings.compiler.version == "14":
-                solution_file = "libusb_2015.sln"
-            if self.settings.compiler.version == "12":
-                solution_file = "libusb_2013.sln"
-            elif self.settings.compiler.version == "11":
-                solution_file = "libusb_2012.sln"
-            solution_file = os.path.join("msvc", solution_file)
+            # Assume we're using the latest Visual Studio and default to libusb_2019.sln
+            # (or libusb_2017.sln for libusb < 1.0.24).
+            # If we're not using the latest Visual Studio, select an appropriate solution file.
+            solution_msvc_year = 2019 if tools.Version(self.version) >= "1.0.24" else 2017
+
+            solution_msvc_year = {
+                "11": 2012,
+                "12": 2013,
+                "14": 2015,
+                "15": 2017
+            }.get(str(self.settings.compiler.version), solution_msvc_year)
+
+            solution_file = os.path.join("msvc", "libusb_{}.sln".format(solution_msvc_year))
             platforms = {"x86":"Win32"}
+            properties = {
+                # Enable LTO when CFLAGS contains -GL
+                "WholeProgramOptimization": "true" if any(re.finditer("(^| )[/-]GL($| )", tools.get_env("CFLAGS", ""))) else "false",
+            }
             msbuild = MSBuild(self)
-            msbuild.build(solution_file, platforms=platforms, upgrade_project=False)
+            msbuild.build(solution_file, platforms=platforms, upgrade_project=False, properties=properties)
 
     def _configure_autotools(self):
         if not self._autotools:
             self._autotools = AutoToolsBuildEnvironment(self, win_bash=tools.os_info.is_windows)
             configure_args = ["--enable-shared" if self.options.shared else "--disable-shared"]
             configure_args.append("--enable-static" if not self.options.shared else "--disable-static")
-            if self.settings.os == "Linux":
+            if self.settings.os in ["Linux", "Android"]:
                 configure_args.append("--enable-udev" if self.options.enable_udev else "--disable-udev")
             elif self._is_mingw:
                 if self.settings.arch == "x86_64":
@@ -96,10 +132,11 @@ class LibUSBConan(ConanFile):
 
     def build(self):
         if self._is_msvc:
-            for vcxproj in ["fxload_2017", "getopt_2017", "hotplugtest_2017", "libusb_dll_2017",
-                            "libusb_static_2017", "listdevs_2017", "stress_2017", "testlibusb_2017", "xusb_2017"]:
-                vcxproj_path = os.path.join(self._source_subfolder, "msvc", "%s.vcxproj" % vcxproj)
-                tools.replace_in_file(vcxproj_path, "<WindowsTargetPlatformVersion>10.0.16299.0</WindowsTargetPlatformVersion>", "")
+            if tools.Version(self.version) < "1.0.24":
+                for vcxproj in ["fxload_2017", "getopt_2017", "hotplugtest_2017", "libusb_dll_2017",
+                                "libusb_static_2017", "listdevs_2017", "stress_2017", "testlibusb_2017", "xusb_2017"]:
+                    vcxproj_path = os.path.join(self._source_subfolder, "msvc", "%s.vcxproj" % vcxproj)
+                    tools.replace_in_file(vcxproj_path, "<WindowsTargetPlatformVersion>10.0.16299.0</WindowsTargetPlatformVersion>", "")
             self._build_visual_studio()
         else:
             autotools = self._configure_autotools()
@@ -126,9 +163,7 @@ class LibUSBConan(ConanFile):
             autotools = self._configure_autotools()
             autotools.install()
             tools.rmdir(os.path.join(self.package_folder, "lib", "pkgconfig"))
-            la_file = os.path.join(self.package_folder, "lib", "libusb-1.0.la")
-            if os.path.isfile(la_file):
-                os.remove(la_file)
+            tools.remove_files_by_mask(os.path.join(self.package_folder, "lib"), "*.la")
 
     def package_info(self):
         self.cpp_info.names["pkg_config"] = "libusb-1.0"
@@ -136,6 +171,7 @@ class LibUSBConan(ConanFile):
         self.cpp_info.includedirs.append(os.path.join("include", "libusb-1.0"))
         if self.settings.os == "Linux":
             self.cpp_info.system_libs.append("pthread")
+        if self.settings.os in ["Linux", "Android"]:
             if self.options.enable_udev:
                 self.cpp_info.system_libs.append("udev")
         elif self.settings.os == "Macos":

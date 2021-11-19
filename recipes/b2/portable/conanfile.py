@@ -1,12 +1,13 @@
 from conans import ConanFile, tools
+from conans.errors import ConanInvalidConfiguration
 import os
 
 
 class B2Conan(ConanFile):
     name = "b2"
-    homepage = "https://boostorg.github.io/build/"
+    homepage = "https://www.bfgroup.xyz/b2/"
     description = "B2 makes it easy to build C++ projects, everywhere."
-    topics = ("conan", "installer", "boost", "builder")
+    topics = ("conan", "installer", "builder")
     license = "BSL-1.0"
     settings = "os", "arch"
     url = "https://github.com/conan-io/conan-center-index"
@@ -45,17 +46,14 @@ class B2Conan(ConanFile):
         'toolset': 'auto'
     }
 
-    def configure(self):
+    def validate(self):
         if (self.options.toolset == 'cxx' or self.options.toolset == 'cross-cxx') and not self.options.use_cxx_env:
             raise ConanInvalidConfiguration(
                 "Option toolset 'cxx' and 'cross-cxx' requires 'use_cxx_env=True'")
 
     def source(self):
-        tools.get(**self.conan_data["sources"][self.version])
-        extracted_dir = "build-" + \
-            os.path.basename(self.conan_data["sources"][self.version]['url']).replace(
-                ".tar.gz", "")
-        os.rename(extracted_dir, "source")
+        tools.get(**self.conan_data["sources"][self.version],
+                  strip_root=True, destination="source")
 
     def build(self):
         use_windows_commands = os.name == 'nt'

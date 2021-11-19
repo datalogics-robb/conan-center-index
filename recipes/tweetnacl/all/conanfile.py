@@ -2,13 +2,16 @@ from conans import ConanFile, CMake, tools
 from conans.errors import ConanInvalidConfiguration
 import os
 
+required_conan_version = ">=1.32.0"
+
 
 class TweetnaclConan(ConanFile):
     name = "tweetnacl"
-    license = "Public Domain"
+    license = "Unlicense"
     homepage = "https://tweetnacl.cr.yp.to"
     url = "https://github.com/conan-io/conan-center-index"
     description = "TweetNaCl is the world's first auditable high-security cryptographic library"
+    topics = ("nacl", "tweetnacl", "encryption", "signature", "hashing")
     exports_sources = "CMakeLists.txt"
     generators = "cmake"
     options = {
@@ -32,6 +35,8 @@ class TweetnaclConan(ConanFile):
         del self.settings.compiler.libcxx
         if self.options.shared:
             del self.options.fPIC
+
+    def validate(self):
         if self.settings.os in ("Windows", "Macos"):
             if self.options.shared:
                 raise ConanInvalidConfiguration("tweetnacl does not support shared on Windows and Madcos: it needs a randombytes implementation")
@@ -58,4 +63,4 @@ class TweetnaclConan(ConanFile):
         cmake.install()
 
     def package_info(self):
-        self.cpp_info.libs = tools.collect_libs(self)
+        self.cpp_info.libs = ["tweetnacl"]

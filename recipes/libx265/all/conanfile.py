@@ -2,30 +2,36 @@ from conans import CMake, ConanFile, tools
 import os
 import shutil
 
+required_conan_version = ">=1.33.0"
+
 
 class Libx265Conan(ConanFile):
     name = "libx265"
     description = "x265 is the leading H.265 / HEVC encoder software library"
     topics = ("conan", "libx265", "codec", "video", "H.265")
     url = "https://github.com/conan-io/conan-center-index"
-    homepage = " https://bitbucket.org/multicoreware/x265"
+    homepage = "https://www.videolan.org/developers/x265.html"
     exports_sources = ["CMakeLists.txt", "patches/*"]
-    generators = "cmake"
+    generators = "cmake", "cmake_find_package"
     license = ("GPL-2.0-only", "commercial")  # https://bitbucket.org/multicoreware/x265/src/default/COPYING
     settings = "os", "arch", "compiler", "build_type"
     options = {
         "shared": [True, False],
         "fPIC": [True, False],
+        "assembly": [True, False],
         "bit_depth": [8, 10, 12],
         "HDR10": [True, False],
         "SVG_HEVC_encoder": [True, False],
+        "with_numa": [True, False]
     }
     default_options = {
         "shared": False,
         "fPIC": True,
+        "assembly": True,
         "bit_depth": 8,
         "HDR10": False,
         "SVG_HEVC_encoder": False,
+        "with_numa": False
     }
 
     _cmake = None
@@ -41,21 +47,37 @@ class Libx265Conan(ConanFile):
     def config_options(self):
         if self.settings.os == "Windows":
             del self.options.fPIC
+        if self.settings.os != "Linux":
+            del self.options.with_numa
+        # FIXME: Disable assembly by default if host is arm and compiler apple-clang for the moment.
+        # Indeed, apple-clang is not able to understand some asm instructions of libx265
+        if self.settings.compiler == "apple-clang" and "arm" in self.settings.arch:
+            self.options.assembly = False
 
     def configure(self):
         if self.options.shared:
             del self.options.fPIC
 
+    def requirements(self):
+        if self.options.get_safe("with_numa", False):
+            self.requires("libnuma/2.0.14")
+
+    def build_requirements(self):
+        if self.options.assembly:
+            if self.settings.arch in ["x86", "x86_64"]:
+                self.build_requires("nasm/2.15.05")
+
     def source(self):
-        tools.get(**self.conan_data["sources"][self.version])
-        os.rename("x265-{}".format(self.version), self._source_subfolder)
+        tools.get(**self.conan_data["sources"][self.version], destination=self._source_subfolder, strip_root=True)
 
     def _configure_cmake(self):
         if self._cmake:
             return self._cmake
         self._cmake = CMake(self)
+        self._cmake.definitions["ENABLE_PIC"] = self.options.get_safe("fPIC", True)
         self._cmake.definitions["ENABLE_SHARED"] = self.options.shared
-        self._cmake.definitions["ENABLE_LIBNUMA"] = False
+        self._cmake.definitions["ENABLE_ASSEMBLY"] = self.options.assembly
+        self._cmake.definitions["ENABLE_LIBNUMA"] = self.options.get_safe("with_numa", False)
         if self.settings.os == "Macos":
             self._cmake.definitions["CMAKE_SHARED_LINKER_FLAGS"] = "-Wl,-read_only_relocs,suppress"
         self._cmake.definitions["HIGH_BIT_DEPTH"] = self.options.bit_depth != 8
@@ -66,6 +88,15 @@ class Libx265Conan(ConanFile):
             self._cmake.definitions["STATIC_LINK_CRT"] = "T" in str(self.settings.compiler.runtime)
         if self.settings.os == "Linux":
             self._cmake.definitions["PLATFORM_LIBS"] = "dl"
+        if tools.cross_building(self.settings):
+            # FIXME: too specific and error prone, should be delegated to CMake helper
+            cmake_system_processor = {
+                "armv8": "aarch64",
+                "armv8.3": "aarch64",
+            }.get(str(self.settings.arch), str(self.settings.arch))
+            self._cmake.definitions["CMAKE_SYSTEM_PROCESSOR"] = cmake_system_processor
+        if "arm" in self.settings.arch:
+            self._cmake.definitions["CROSS_COMPILE_ARM"] = tools.cross_building(self.settings)
         self._cmake.configure(build_folder=self._build_subfolder)
         return self._cmake
 
@@ -115,14 +146,16 @@ class Libx265Conan(ConanFile):
     def package_info(self):
         self.cpp_info.names["pkg_config"] = "x265"
         self.cpp_info.libs = ["x265"]
-        if self.settings.os == "Linux":
+        if self.settings.os == "Windows":
+            if self.options.shared:
+                self.cpp_info.defines.append("X265_API_IMPORTS")
+        elif self.settings.os == "Linux":
             self.cpp_info.system_libs.extend(["dl", "pthread", "m"])
-        if self.settings.os == "Android":
+            if not self.options.shared:
+                if self.settings.compiler != "Visual Studio":
+                    self.cpp_info.sharedlinkflags = ["-Wl,-Bsymbolic,-znoexecstack"]
+        elif self.settings.os == "Android":
             self.cpp_info.libs.extend(["dl", "m"])
-        libcxx = self.settings.get_safe("compiler.libcxx")
-        if libcxx in ["libstdc++", "libstdc++11"]:
-            self.cpp_info.system_libs.append("stdc++")
-        elif libcxx == "libc++":
-            self.cpp_info.system_libs.append("c++")
-        elif libcxx in ["c++_static", "c++_shared"]:
-            self.cpp_info.system_libs.extend([libcxx, "c++abi"])
+        libcxx = tools.stdcpp_library(self)
+        if libcxx:
+            self.cpp_info.system_libs.append(libcxx)

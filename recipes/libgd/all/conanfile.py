@@ -1,23 +1,39 @@
-import os
 from conans import ConanFile, tools, CMake
+import os
+
+required_conan_version = ">=1.33.0"
 
 
 class LibgdConan(ConanFile):
     name = "libgd"
-    license = "https://github.com/libgd/libgd/blob/master/COPYING"
+    license = "BSD-like"
     url = "https://github.com/conan-io/conan-center-index"
-    description = "GD is an open source code library for the dynamic creation of images by programmers."
+    description = ("GD is an open source code library for the dynamic "
+                   "creation of images by programmers.")
     topics = ("images", "graphics")
-    settings = "os", "compiler", "build_type", "arch"
     homepage = "https://libgd.github.io"
-    options = {"shared": [True, False], "fPIC": [True, False]}
-    default_options = {"shared": False, "fPIC": True}
-    generators = "cmake"
-    requires = "zlib/1.2.11"
 
-    def config_options(self):
-        if self.settings.os == "Windows":
-            self.options.remove("fPIC")
+    settings = "os", "arch", "compiler", "build_type"
+    options = {
+        "shared": [True, False],
+        "fPIC": [True, False],
+        "with_png": [True, False],
+        "with_jpeg": [True, False],
+        "with_tiff": [True, False],
+        "with_freetype": [True, False],
+    }
+    default_options = {
+        "shared": False,
+        "fPIC": True,
+        "with_png": False,
+        "with_jpeg": False,
+        "with_tiff": False,
+        "with_freetype": False,
+    }
+
+    exports_sources = "CMakeLists.txt", "patches/**"
+    generators = "cmake", "cmake_find_package"
+    _cmake = None
 
     @property
     def _source_subfolder(self):
@@ -27,76 +43,87 @@ class LibgdConan(ConanFile):
     def _build_subfolder(self):
         return "build_subfolder"
 
+    def config_options(self):
+        if self.settings.os == "Windows":
+            del self.options.fPIC
+
+    def configure(self):
+        if self.options.shared:
+            del self.options.fPIC
+
+    def requirements(self):
+        self.requires("zlib/1.2.11")
+        if self.options.with_png:
+            self.requires("libpng/1.6.37")
+            self.requires("getopt-for-visual-studio/20200201")
+        if self.options.with_jpeg:
+            self.requires("libjpeg/9d")
+        if self.options.with_tiff:
+            self.requires("libtiff/4.3.0")
+        if self.options.with_freetype:
+            self.requires("freetype/2.11.0")
+
     def source(self):
-        tools.get(**self.conan_data["sources"][self.version])
-        os.rename('libgd-' + self.version, self._source_subfolder)
-        tools.replace_in_file(
-            os.path.join(
-                self._source_subfolder,
-                "CMakeLists.txt"),
-            "CMAKE_MINIMUM_REQUIRED(VERSION 2.6 FATAL_ERROR)",
-            '''cmake_minimum_required (VERSION 3.6 FATAL_ERROR)
-PROJECT(GD C)
-include(${CMAKE_BINARY_DIR}/../conanbuildinfo.cmake)
-conan_basic_setup()''')
-        tools.replace_in_file(
-            os.path.join(
-                self._source_subfolder,
-                "CMakeLists.txt"),
-            'PROJECT(GD)',
-            '# moved: PROJECT(GD)')
-        tools.replace_in_file(
-            os.path.join(
-                self._source_subfolder,
-                "CMakeLists.txt"),
-            'if(NOT MINGW AND MSVC_VERSION GREATER 1399)',
-            'if (BUILD_STATIC_LIBS AND WIN32 AND NOT MINGW AND NOT MSYS)')
-        tools.replace_in_file(
-            os.path.join(
-                self._source_subfolder,
-                "src",
-                "CMakeLists.txt"),
-            '''if (BUILD_SHARED_LIBS)
-	target_link_libraries(${GD_LIB} ${LIBGD_DEP_LIBS})''',
-            '''if (NOT WIN32)
-    list(APPEND LIBGD_DEP_LIBS  m)
-endif()
-if (BUILD_SHARED_LIBS)
-	target_link_libraries(${GD_LIB} ${LIBGD_DEP_LIBS})
-''')
+        tools.get(**self.conan_data["sources"][self.version],
+                  destination=self._source_subfolder, strip_root=True)
+
+    def _patch(self):
+        for patch in self.conan_data.get("patches", {}).get(self.version, []):
+            tools.patch(**patch)
+        cmakelists = os.path.join(self._source_subfolder, "CMakeLists.txt")
+        tools.replace_in_file(cmakelists, "${CMAKE_SOURCE_DIR}", "${CMAKE_CURRENT_SOURCE_DIR}")
+        tools.replace_in_file(cmakelists,
+                              "SET(CMAKE_MODULE_PATH \"${GD_SOURCE_DIR}/cmake/modules\")",
+                              "LIST(APPEND CMAKE_MODULE_PATH \"${GD_SOURCE_DIR}/cmake/modules\")")
+        tools.replace_in_file(os.path.join(self._source_subfolder, "src", "CMakeLists.txt"),
+                              "RUNTIME DESTINATION bin",
+                              "RUNTIME DESTINATION bin BUNDLE DESTINATION bin")
+
+    def _configure_cmake(self):
+        if self._cmake:
+            return self._cmake
+        self._cmake = CMake(self)
+        self._cmake.definitions["BUILD_STATIC_LIBS"] = not self.options.shared
+        if tools.Version(self.version) >= "2.3.0":
+            self._cmake.definitions["ENABLE_GD_FORMATS"] = True
+        self._cmake.definitions["ENABLE_PNG"] = self.options.with_png
+        self._cmake.definitions["ENABLE_LIQ"] = False
+        self._cmake.definitions["ENABLE_JPEG"] = self.options.with_jpeg
+        self._cmake.definitions["ENABLE_TIFF"] = self.options.with_tiff
+        self._cmake.definitions["ENABLE_ICONV"] = False
+        self._cmake.definitions["ENABLE_XPM"] = False
+        self._cmake.definitions["ENABLE_FREETYPE"] = self.options.with_freetype
+        self._cmake.definitions["ENABLE_FONTCONFIG"] = False
+        self._cmake.definitions["ENABLE_WEBP"] = False
+        if tools.Version(self.version) >= "2.3.2":
+            self._cmake.definitions["ENABLE_HEIF"] = False
+            self._cmake.definitions["ENABLE_AVIF"] = False
+        if tools.Version(self.version) >= "2.3.0":
+            self._cmake.definitions["ENABLE_RAQM"] = False
+        self._cmake.configure(build_folder=self._build_subfolder)
+        return self._cmake
 
     def build(self):
-        cmake = CMake(self)
-        cmake.definitions['BUILD_STATIC_LIBS'] = not self.options.shared
-        cmake.definitions["ZLIB_LIBRARY"] = self.deps_cpp_info["zlib"].libs[0]
-        cmake.definitions["ZLIB_INCLUDE_DIR"] = self.deps_cpp_info["zlib"].include_paths[0]
-        cmake.configure(
-            source_folder=self._source_subfolder,
-            build_folder=self._build_subfolder)
+        self._patch()
+        cmake = self._configure_cmake()
         cmake.build()
-        cmake.install()
 
     def package(self):
-        self.copy("COPYING", src=self._source_subfolder, dst="licenses", ignore_case=True, keep_path=False)
-        tools.rmdir(os.path.join(self.package_folder, 'share'))
-        self.copy("*", src="bin", dst="bin")
-        self.copy("*", src="lib", dst="lib")
-        self.copy("entities.h", dst="include", src="src")
-        self.copy("gd.h", dst="include", src="src")
-        self.copy("gd_color_map.h", dst="include", src="src")
-        self.copy("gd_errors.h", dst="include", src="src")
-        self.copy("gd_io.h", dst="include", src="src")
-        self.copy("gdcache.h", dst="include", src="src")
-        self.copy("gdfontg.h", dst="include", src="src")
-        self.copy("gdfontl.h", dst="include", src="src")
-        self.copy("gdfontmb.h", dst="include", src="src")
-        self.copy("gdfonts.h", dst="include", src="src")
-        self.copy("gdfontt.h", dst="include", src="src")
-        self.copy("gdfx.h", dst="include", src="src")
-        self.copy("gdpp.h", dst="include", src="src")
+        self.copy("COPYING", src=self._source_subfolder, dst="licenses")
+        cmake = self._configure_cmake()
+        cmake.install()
+        tools.rmdir(os.path.join(self.package_folder, "share"))
+        tools.rmdir(os.path.join(self.package_folder, "lib", "pkgconfig"))
 
     def package_info(self):
+        self.cpp_info.names["pkg_config"]= "gdlib"
         self.cpp_info.libs = tools.collect_libs(self)
-        if not self.options.shared:
-            self.cpp_info.defines.append('NONDLL')
-            self.cpp_info.defines.append('BGDWIN32')
+        if self.settings.os == "Windows" and not self.options.shared:
+            self.cpp_info.defines.append("BGD_NONDLL")
+            self.cpp_info.defines.append("BGDWIN32")
+        if self.settings.os in ("FreeBSD", "Linux"):
+            self.cpp_info.system_libs.append("m")
+
+        bin_path = os.path.join(self.package_folder, "bin")
+        self.output.info("Appending PATH environment variable: {}".format(bin_path))
+        self.env_info.PATH.append(bin_path)
