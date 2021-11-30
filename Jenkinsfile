@@ -28,6 +28,8 @@ pipeline {
                          'windows-x64-conan-center-index'],
                description: 'Run on specific platform')
         booleanParam defaultValue: false, description: 'Completely clean the workspace before building, including the Conan cache', name: 'CLEAN_WORKSPACE'
+        booleanParam name: 'UPLOAD_ALL_RECIPES', defaultValue: false,
+            description: 'Upload all recipes, instead of only recipes that changed since the last merge'
     }
     options{
         buildDiscarder logRotator(artifactDaysToKeepStr: '4', artifactNumToKeepStr: '10', daysToKeepStr: '7', numToKeepStr: '10')
@@ -46,6 +48,7 @@ pipeline {
         // AIX workaround. Avoids an issue caused by the jenkins java process which sets
         // LIBPATH and causes errors downstream
         LIBPATH = "randomval"
+        DL_CONAN_CENTER_INDEX = 'all'
     }
     stages {
         stage('Clean/reset Git checkout for release') {
@@ -105,9 +108,36 @@ pipeline {
                 }
             }
         }
-        stage('Common recipe upload') {
+        stage('Set up Conan') {
             steps {
-                echo 'Would upload recipes here'
+                sh """. ${ENV_LOC['noarch']}/bin/activate
+                  invoke conan.login"""
+            }
+        }
+        stage('Upload new or changed recipes') {
+            when {
+                not {
+                    changeRequest()
+                }
+            }
+            steps {
+                script {
+                    if (env.BRANCH_NAME =~ 'master*') {
+                        remote = 'conan-center-dl'
+                    } else {
+                        remote = 'conan-center-dl-staging'
+                    }
+                    if (params.UPLOAD_ALL_RECIPES) {
+                        range = '--all'
+                    } else {
+                        // assuming this is due to a merge, upload recipes
+                        // modified since just before the last merge. This is an
+                        // incremental update to recipes, and will be much faster
+                        // than uploading all 1100+ recipes.
+                        range = "--since-before-last-merge"
+                    }
+                    sh ". ${ENV_LOC['noarch']}/bin/activate; invoke upload-recipes --remote ${remote} ${range}"
+                }
             }
         }
         stage('Per-platform') {
