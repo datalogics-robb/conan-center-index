@@ -11,24 +11,39 @@ from invoke.tasks import Task, task
             'package': 'name of package to upload, can be specified more than once',
             'all': 'upload all packages in recipes folder',
             'since-commit': 'upload all packages in recipes folder changed since COMMIT',
+            'since-before-last-merge': 'upload all packages in recipes folder changed since just before the most '
+                                       'recent merge (this is useful for automated tools)',
             'parallel': 'run uploads in parallel (default)',
             'upload': 'upload the recipe (default) (otherwise, just does the exports)'
             },
       iterable=['package'])
-def upload_recipes(ctx, remote='conan-center-dl-staging', package=None, all=False, since_commit=None, parallel=True,
-                   upload=True):
+def upload_recipes(ctx, remote='conan-center-dl-staging', package=None, all=False, since_commit=None,
+                   since_before_last_merge=False, parallel=True, upload=True):
     """Export and upload the named recipes to the given remote.
 
     Exports and uploads all the versions of the selected recipes to the remote."""
     packages = set()
-    packages.update(package or [])
-    if all:
-        packages.update(os.listdir('recipes'))
-    if since_commit:
+
+    def update_since_commit(since_commit):
         stm = io.StringIO()
         ctx.run(f'git diff --name-only {since_commit} -- recipes', out_stream=stm, pty=False, dry=False)
         lines = stm.getvalue().strip('\n').split('\n')
         packages.update(path.split('/')[1] for path in lines if path)
+
+    packages.update(package or [])
+    if all:
+        packages.update(os.listdir('recipes'))
+    if since_commit:
+        update_since_commit(since_commit)
+    if since_before_last_merge:
+        stm = io.StringIO()
+        # Find most recent merge commit from current HEAD, basically the first rev that has more than one parent
+        # https://stackoverflow.com/a/41464631/11996393
+        ctx.run('git rev-list --min-parents=2 --max-count=1 HEAD', out_stream=stm, pty=False, dry=False)
+        commit = stm.getvalue().strip('\n')
+        # {commit}~1 is the first parent of {commit}; see https://git-scm.com/docs/git-rev-parse#_specifying_revisions
+        update_since_commit(f'{commit}~1')
+
     sorted_packages = sorted(packages)
     print('*** Uploading:')
     for pkg in sorted_packages:
