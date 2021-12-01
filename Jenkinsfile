@@ -141,6 +141,11 @@ pipeline {
             }
         }
         stage('Per-platform') {
+            when {
+                // Turn off for now; testing verified that the structure works (common part then matrix part),
+                // and the per-platform tasks aren't there yet.
+                expression { false }
+            }
             matrix {
                 agent {
                     node {
