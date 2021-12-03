@@ -114,6 +114,24 @@ pipeline {
                   invoke conan.login"""
             }
         }
+        stage('flake8') {
+            steps {
+                catchError(message: 'flake8 had errors', stageResult: 'FAILURE') {
+                    script {
+                        sh """. ${ENV_LOC['noarch']}/bin/activate
+                                    rm -f flake8.log
+                                    flake8 --format=pylint --output=flake8.log --tee"""
+                    }
+                }
+            }
+            post {
+                always {
+                    recordIssues(enabledForFailure: true,
+                                 tool: flake8(pattern: 'flake8.log'),
+                                 qualityGates: [[threshold: 1, type: 'TOTAL', unstable: false]])
+                }
+            }
+        }
         stage('Upload new or changed recipes') {
             when {
                 not {
