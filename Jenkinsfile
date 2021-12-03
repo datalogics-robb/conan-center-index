@@ -246,6 +246,26 @@ pipeline {
             }
         }
     }
+    post {
+        unsuccessful {
+            script {
+                if (env.CHANGE_ID == null) {  // i.e. not a pull request; those notify in GitHub
+                    slackSend(channel: "#conan",
+                              message: "Unsuccessful build: ${env.JOB_NAME} ${env.BUILD_NUMBER} (<${env.BUILD_URL}|Open>)",
+                              color: "danger")
+                }
+            }
+        }
+        fixed {
+            script {
+                if (env.CHANGE_ID == null) {  // i.e. not a pull request; those notify in GitHub
+                    slackSend(channel: "#conan",
+                              message: "Build is now working: ${env.JOB_NAME} ${env.BUILD_NUMBER} (<${env.BUILD_URL}|Open>)",
+                              color: "good")
+                }
+            }
+        }
+    }
 }
 
 void printPlatformNameInStep(String node) {
