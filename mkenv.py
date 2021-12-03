@@ -18,7 +18,8 @@ join = os.path.join
 lower_node = platform.node().split('.')[0].lower().replace(' ', '-')
 # See https://stackoverflow.com/a/10839538, but use ASCII letters
 allowed = string.digits + string.ascii_letters + '-_'
-HOME_DIR = join(HERE, 'python-env-%s' % ''.join(filter(allowed.__contains__, lower_node)))
+filtered_node = ''.join(filter(allowed.__contains__, lower_node))
+HOME_DIR = join(HERE, f'python-env-{filtered_node}')
 
 
 def install_project_requirements(output_route):
