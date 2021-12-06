@@ -5,3 +5,5 @@ flake8
 flake8-printf-formatting
 pipdeptree
 certifi
+pytest
+pytest-html

@@ -447,3 +447,7 @@ requirements.txt
 
 # scons build files
 *.dblite
+
+# Test outputs
+/test-report.xml
+/test-report.html
