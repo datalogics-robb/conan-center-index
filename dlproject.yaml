@@ -154,6 +154,43 @@ config:
         # profile:
         #     - apple-clang-10.0-macos-10.9
         #     - build_tools
+        common: &macOSCommon
+            # Note: split build/host profiles aren't supported by recipes in Conan Center Index
+            # profile_build:
+            #     - apple-clang-12.0-macos-10.9-cppstd-14
+            build:
+                - missing
+        config:
+            Release: &macOSRelease
+                <<: *macOSCommon
+                build_folder: build-release
+                description: macOS Release
+                profile_host:
+                    - apple-clang-12.0-macos-10.9-cppstd-14
+            Debug: &macOSDebug
+                <<: *macOSRelease
+                build_folder: build
+                description: macOS Debug
+                settings:
+                    - build_type=Debug
+            ReleaseTool: &macOSReleaseTool
+                <<: *macOSCommon
+                build_folder: build-release
+                description: macOS Release
+                profile_host:
+                    - apple-clang-12.0-macos-10.9
+            DebugTool: &macOSDebugTool
+                <<: *macOSReleaseTool
+                build_folder: build
+                description: macOS Debug
+                settings:
+                    - build_type=Debug
+        prebuilt_tools:
+            - cmake/3.21.4
+            - doxygen/1.9.1
+        prebuilt_tools_configs:
+            - DebugTool
+            - ReleaseTool
 
     redhat:
 
