@@ -1,31 +1,28 @@
 def ENV_LOC = [:]
-def ARCH = [
-    'aix-32-conan-center-index': 'ppc32',
-    'aix-64-conan-center-index': 'ppc64',
-    'linux-x86-conan-center-index': 'x86',
-    'linux-x64-conan-center-index': 'x64',
-    'linux-arm-conan-center-index': 'armv8',
-    'mac-x64-conan-center-index': 'x64',
-    'mac-arm-conan-center-index': 'armv8',
-    'sparcsolaris-32-conan-center-index': 'sparc',
-    'sparcsolaris-64-conan-center-index': 'sparcv9',
-    'windows-x86-conan-center-index': 'x86',
-    'windows-x64-conan-center-index': 'x64']
+// Which nodes build tools. The linux-x64-tools-conan-center-index is an older machine
+// that uses an earlier glibc, so the tools will run on every machine.
+def BUILD_TOOLS=[
+    'aix-conan-center-index': true,
+    'linux-x64-conan-center-index': false,
+    'linux-x64-tools-conan-center-index': true,
+    'linux-arm-conan-center-index': true,
+    'mac-x64-conan-center-index': true,
+    'mac-arm-conan-center-index': true,
+    'sparcsolaris-conan-center-index': true,
+    'windows-conan-center-index': true,
+]
 pipeline {
     parameters {
         choice(name: 'PLATFORM_FILTER',
                choices: ['all',
-                         'aix-32-conan-center-index',
-                         'aix-64-conan-center-index',
-                         'linux-x86-conan-center-index',
+                         'aix-conan-center-index',
                          'linux-x64-conan-center-index',
+                         'linux-x64-tools-conan-center-index',
                          'linux-arm-conan-center-index',
                          'mac-x64-conan-center-index',
                          'mac-arm-conan-center-index',
-                         'sparcsolaris-32-conan-center-index',
-                         'sparcsolaris-64-conan-center-index',
-                         'windows-x86-conan-center-index',
-                         'windows-x64-conan-center-index'],
+                         'sparcsolaris-conan-center-index',
+                         'windows-conan-center-index'],
                description: 'Run on specific platform')
         booleanParam defaultValue: false, description: 'Completely clean the workspace before building, including the Conan cache', name: 'CLEAN_WORKSPACE'
         booleanParam name: 'UPLOAD_ALL_RECIPES', defaultValue: false,
@@ -45,10 +42,15 @@ pipeline {
         CONAN_USER_HOME = "${WORKSPACE}"
         CONAN_NON_INTERACTIVE = '1'
         CONAN_PRINT_RUN_COMMANDS = '1'
+        // Disable FileTracker on Windows, which can give FTK1011 on long path names
+        TRACKFILEACCESS = 'false'
+        // Disable node reuse, which gives intermittent build errors on Windows
+        MSBUILDDISABLENODEREUSE = '1'
         // AIX workaround. Avoids an issue caused by the jenkins java process which sets
         // LIBPATH and causes errors downstream
         LIBPATH = "randomval"
         DL_CONAN_CENTER_INDEX = 'all'
+        TOX_TESTENV_PASSENV = 'CONAN_USER_HOME CONAN_NON_INTERACTIVE CONAN_PRINT_RUN_COMMANDS CONAN_LOGIN_USERNAME CONAN_PASSWORD TRACKFILEACCESS MSBUILDDISABLENODEREUSE'
     }
     stages {
         stage('Clean/reset Git checkout for release') {
@@ -159,16 +161,11 @@ pipeline {
             }
         }
         stage('Per-platform') {
-            when {
-                // Turn off for now; testing verified that the structure works (common part then matrix part),
-                // and the per-platform tasks aren't there yet.
-                expression { false }
-            }
             matrix {
                 agent {
                     node {
                         label "${NODE}"
-                        customWorkspace "workspace/${JOB_NAME}_${ARCH[NODE]}/"
+                        customWorkspace "workspace/${JOB_NAME}/"
                     }
                 }
                 when { anyOf {
@@ -178,18 +175,18 @@ pipeline {
                 axes {
                     axis {
                         name 'NODE'
-                        values 'aix-32-conan-center-index',
-                            'aix-64-conan-center-index',
-                            'linux-x86-conan-center-index',
+                        values 'aix-conan-center-index',
                             'linux-x64-conan-center-index',
+                            'linux-x64-tools-conan-center-index',
                             'linux-arm-conan-center-index',
                             'mac-x64-conan-center-index',
                             'mac-arm-conan-center-index',
-                            'sparcsolaris-32-conan-center-index',
-                            'sparcsolaris-64-conan-center-index',
-                            'windows-x86-conan-center-index',
-                            'windows-x64-conan-center-index'
+                            'sparcsolaris-conan-center-index',
+                            'windows-conan-center-index'
                     }
+                }
+                environment {
+                    CONAN_USER_HOME = "${WORKSPACE}"
                 }
                 stages {
                     stage('Clean/reset Git checkout for release') {
@@ -256,6 +253,74 @@ pipeline {
                                     sh "env"
                                 } else {
                                     bat "set"
+                                }
+                            }
+                        }
+                    }
+                    stage('Set up Conan') {
+                        steps {
+                            script {
+                                if (isUnix()) {
+                                    sh """. ${ENV_LOC[NODE]}/bin/activate
+                                        invoke conan.login"""
+                                } else {
+                                    bat """CALL ${ENV_LOC[NODE]}\\Scripts\\activate
+                                        invoke conan.login"""
+                                }
+                            }
+                        }
+                    }
+                    stage('build tools') {
+                        when {
+                            allOf {
+                                not {
+                                    changeRequest()
+                                }
+                                expression { BUILD_TOOLS[NODE] }
+                            }
+                        }
+                        steps {
+                            script {
+                                if (env.BRANCH_NAME =~ 'master*') {
+                                    remote = 'conan-center-dl'
+                                } else {
+                                    remote = 'conan-center-dl-staging'
+                                }
+                                short_node = NODE.replace('-conan-center-index', '')
+                                pytest_command = "pytest -k build_tool --upload-to ${remote} --junitxml=build-tools.xml --html=${short_node}-build-tools.html"
+                                if (isUnix()) {
+                                    catchError(message: 'pytest had errors', stageResult: 'FAILURE') {
+                                        script {
+                                            // on macOS, /usr/local/bin is not in the path by default, and the
+                                            // Python binaries tox is looking for may be in there
+                                            sh """. ${ENV_LOC[NODE]}/bin/activate
+                                                (env PATH=\$PATH:/usr/local/bin ${pytest_command})"""
+                                        }
+                                    }
+                                }
+                                else {
+                                    catchError(message: 'pytest had errors', stageResult: 'FAILURE') {
+                                        script {
+                                            bat """CALL ${ENV_LOC[NODE]}\\Scripts\\activate
+                                                ${pytest_command}"""
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        post {
+                            always {
+                                catchError(message: 'testing had errors', stageResult: 'FAILURE') {
+                                    xunit (
+                                        reduceLog: false,
+                                        tools: [
+                                            JUnit(deleteOutputFiles: true,
+                                                  failIfNotNew: true,
+                                                  pattern: 'build-tools.xml',
+                                                  skipNoTestFiles: true,
+                                                  stopProcessingIfError: true)
+                                        ])
+                                    archiveArtifacts allowEmptyArchive: true, artifacts: '*-build-tools.html', followSymlinks: false
                                 }
                             }
                         }
