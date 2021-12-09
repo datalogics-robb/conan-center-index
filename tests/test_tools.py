@@ -53,13 +53,18 @@ def tool_recipe_folder(prebuilt_tool):
 
 
 class TestBuildTools(object):
-    def test_build_tool(self, prebuilt_tool, prebuilt_tool_config, tool_recipe_folder, upload_to):
+    def test_build_tool(self, prebuilt_tool, prebuilt_tool_config, tool_recipe_folder, upload_to, force_build):
         tool_options = []
         for opt in prebuilt_tool.options:
             tool_options.append('--options:host')
             tool_options.append(opt)
+        force_build_options = []
+        if force_build == 'package':
+            force_build_options = ['--build', prebuilt_tool.package.split('/', maxsplit=1)[0]]
+        elif force_build == 'with-requirements':
+            force_build_options = ['--build', 'all']
         args = ['conan', 'create', tool_recipe_folder, f'{prebuilt_tool.package}@',
-                '--update'] + prebuilt_tool_config.install_options() + tool_options
+                '--update'] + prebuilt_tool_config.install_options() + tool_options + force_build_options
         print(f'Creating package {prebuilt_tool.package}: {" ".join(args)}')
         subprocess.run(args, check=True)
         if upload_to:
