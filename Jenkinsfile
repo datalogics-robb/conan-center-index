@@ -187,6 +187,7 @@ pipeline {
                 }
                 environment {
                     CONAN_USER_HOME = "${WORKSPACE}"
+                    DL_CONAN_CENTER_INDEX = productionOrStaging()
                 }
                 stages {
                     stage('Clean/reset Git checkout for release') {
@@ -347,6 +348,22 @@ pipeline {
                               color: "good")
                 }
             }
+        }
+    }
+}
+
+void productionOrStaging() {
+    if (env.CHANGE_ID == null) {
+        if (env.BRANCH_NAME =~ 'master*') {
+            return 'production'
+        } else {
+            return 'staging'
+        }
+    } else {
+        if (env.CHANGE_BRANCH =~ 'master*') {
+            return 'production'
+        } else {
+            return 'staging'
         }
     }
 }
