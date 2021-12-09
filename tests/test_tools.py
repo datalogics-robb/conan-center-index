@@ -1,3 +1,4 @@
+import json
 import subprocess
 from typing import NamedTuple, List
 
@@ -53,7 +54,8 @@ def tool_recipe_folder(prebuilt_tool):
 
 
 class TestBuildTools(object):
-    def test_build_tool(self, prebuilt_tool, prebuilt_tool_config, tool_recipe_folder, upload_to, force_build):
+    def test_build_tool(self, prebuilt_tool, prebuilt_tool_config, tool_recipe_folder, upload_to, force_build,
+                        tmp_path):
         tool_options = []
         for opt in prebuilt_tool.options:
             tool_options.append('--options:host')
@@ -63,11 +65,19 @@ class TestBuildTools(object):
             force_build_options = ['--build', prebuilt_tool.package.split('/', maxsplit=1)[0]]
         elif force_build == 'with-requirements':
             force_build_options = ['--build', 'all']
-        args = ['conan', 'create', tool_recipe_folder, f'{prebuilt_tool.package}@',
-                '--update'] + prebuilt_tool_config.install_options() + tool_options + force_build_options
+        create_json = tmp_path / 'create.json'
+        args = ['conan', 'create', tool_recipe_folder, f'{prebuilt_tool.package}@', '--update', '--json',
+                str(create_json)] + prebuilt_tool_config.install_options() + tool_options + force_build_options
         print(f'Creating package {prebuilt_tool.package}: {" ".join(args)}')
         subprocess.run(args, check=True)
         if upload_to:
-            args = ['conan', 'upload', '-r', upload_to, f'{prebuilt_tool.package}@', '--all', '--check']
-        print(f'Uploading {prebuilt_tool.package}: {" ".join(args)}')
-        subprocess.run(args, check=True)
+            # upload packages mentioned in the create.json, which includes requirements used to build
+            # this package, if in fact it had to be built.
+            with open(create_json) as json_file:
+                create_data = json.load(json_file)
+            for install in create_data['installed']:
+                recipe_id = install['recipe']['id']
+                ref = recipe_id.split('#')[0]
+                args = ['conan', 'upload', '-r', upload_to, f'{ref}@', '--all', '--check']
+                print(f'Uploading {ref}: {" ".join(args)}')
+                subprocess.run(args, check=True)
