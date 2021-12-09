@@ -199,6 +199,73 @@ config:
             - ReleaseTool
 
     redhat:
+        common: &redhatCommon
+            build:
+                - missing
+        config:
+            Release: &redhatRelease
+                <<: *redhatCommon
+                build_folder: build-release
+                description: RedHat Release
+                profile_host:
+                    - llvm-toolset-7-cppstd-14
+            Debug: &redhatDebug
+                <<: *redhatRelease
+                build_folder: build-debug
+                description: RedHat Debug
+                settings:
+                    - build_type=Debug
+            Release32: &redhatRelease32
+                <<: *redhatCommon
+                build_folder: build-release-32
+                description: RedHat Release 32
+                profile_host:
+                    - llvm-toolset-7-cppstd-14
+                settings:
+                    - arch=x86
+            Debug32: &redhatDebug32
+                <<: *redhatRelease32
+                build_folder: build-debug-32
+                description: RedHat Debug 32
+                settings:
+                    - build_type=Debug
+            ReleaseTool: &redhatReleaseTool
+                <<: *redhatCommon
+                build_folder: build-release-tool
+                description: RedHat Release Tool
+                profile_host:
+                    - devtoolset-7
+            DebugTool: &redhatDebugTool
+                <<: *redhatReleaseTool
+                build_folder: build-debug-tool
+                description: RedHat Debug Tool
+                settings:
+                    - build_type=Debug
+            ReleaseTool32: &redhatReleaseTool32
+                <<: *redhatReleaseTool
+                build_folder: build-release-tool-32
+                description: RedHat Release Tool 32
+                settings:
+                    - arch=x86
+            DebugTool32: &redhatDebugTool32
+                <<: *redhatReleaseTool32
+                build_folder: build-debug-tool-32
+                description: RedHat Debug Tool 32
+                settings:
+                    - build_type=Debug
+        prebuilt_tools:
+            - cmake/3.21.4
+            - doxygen/1.9.1
+            - package: doxygen/1.9.1
+              options:
+                  - doxygen:enable_search=False
+            - ninja/1.10.2
+        prebuilt_tools_configs:
+            - DebugTool
+            - ReleaseTool
+            - DebugTool32
+            - ReleaseTool32
+
 
     windows:
         # Can set the generator differently on a per-machine basis (but automatic is
@@ -209,6 +276,45 @@ config:
         # Can override packager build_tools on a per-platform basis:
         # packager:
         #     build_tools: build_tools_windows
+        common: &windowsCommon
+            profile_host: visual-studio-15
+            build:
+                - missing
+        config:
+            Release: &windowsRelease
+                <<: *windowsCommon
+                build_folder: build-release
+                description: Windows Release
+            Debug: &windowsDebug
+                <<: *windowsRelease
+                build_folder: build-debug
+                description: Windows Debug
+                settings:
+                    - build_type=Debug
+            Release32: &windowsRelease32
+                <<: *windowsRelease
+                build_folder: build-release-32
+                description: Windows Release 32
+                settings:
+                    - arch=x86
+            Debug32: &windowsDebug32
+                <<: *windowsRelease32
+                build_folder: build-debug-32
+                description: Windows Debug 32
+                settings:
+                    - build_type=Debug
+        prebuilt_tools:
+            - cmake/3.21.4
+            - doxygen/1.9.1
+            - package: doxygen/1.9.1
+              options:
+                  - doxygen:enable_search=False
+            - ninja/1.10.2
+        prebuilt_tools_configs:
+            - Debug
+            - Release
+            - Debug32
+            - Release32
 
     byhost:
         # Configs based on hostname.
