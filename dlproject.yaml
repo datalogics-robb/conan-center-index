@@ -193,6 +193,7 @@ config:
             - package: doxygen/1.9.1
               options:
                   - doxygen:enable_search=False
+            - ninja/1.10.2
         prebuilt_tools_configs:
             - DebugTool
             - ReleaseTool
