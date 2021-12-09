@@ -27,6 +27,10 @@ pipeline {
         booleanParam defaultValue: false, description: 'Completely clean the workspace before building, including the Conan cache', name: 'CLEAN_WORKSPACE'
         booleanParam name: 'UPLOAD_ALL_RECIPES', defaultValue: false,
             description: 'Upload all recipes, instead of only recipes that changed since the last merge'
+        booleanParam name: 'FORCE_TOOL_BUILD', defaultValue: false,
+            description: 'Force build of all tools. By default, Conan will download the tool and test it if it\'s already built'
+        booleanParam name: 'FORCE_TOOL_BUILD_WITH_REQUIREMENTS', defaultValue: false,
+            description: 'Force build of all tools, and their requirements. By default, Conan will download the tool and test it if it\'s already built'
     }
     options{
         buildDiscarder logRotator(artifactDaysToKeepStr: '4', artifactNumToKeepStr: '10', daysToKeepStr: '7', numToKeepStr: '10')
@@ -288,7 +292,14 @@ pipeline {
                                     remote = 'conan-center-dl-staging'
                                 }
                                 short_node = NODE.replace('-conan-center-index', '')
-                                pytest_command = "pytest -k build_tool --upload-to ${remote} --junitxml=build-tools.xml --html=${short_node}-build-tools.html"
+                                if (params.FORCE_TOOL_BUILD_WITH_REQUIREMENTS) {
+                                    force_build = '--force-build with-requirements'
+                                } else if (params.FORCE_TOOL_BUILD) {
+                                    force_build = '--force-build'
+                                } else {
+                                    force_build = ''
+                                }
+                                pytest_command = "pytest -k build_tool ${force_build} --upload-to ${remote} --junitxml=build-tools.xml --html=${short_node}-build-tools.html"
                                 if (isUnix()) {
                                     catchError(message: 'pytest had errors', stageResult: 'FAILURE') {
                                         script {

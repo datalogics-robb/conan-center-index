@@ -3,7 +3,7 @@ import pytest
 
 def pytest_addoption(parser):
     parser.addoption('--upload-to', help='upload built packages to the given remote')
-    parser.addoption('--force-build', choices=['package', 'with_requirements'], const='package', nargs='?',
+    parser.addoption('--force-build', choices=['package', 'with-requirements'], const='package', nargs='?',
                      help='Force a build of the package or the package with its requirements')
 
 

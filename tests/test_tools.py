@@ -61,13 +61,23 @@ class TestBuildTools(object):
             tool_options.append('--options:host')
             tool_options.append(opt)
         force_build_options = []
+
         if force_build == 'package':
-            force_build_options = ['--build', prebuilt_tool.package.split('/', maxsplit=1)[0]]
+            force_build_options = ['--build', prebuilt_tool.package.split('/', maxsplit=1)[0],
+                                   '--build', 'missing']
         elif force_build == 'with-requirements':
-            force_build_options = ['--build', 'all']
+            force_build_options = ['--build']
+        else:
+            force_build_options = ['--build', 'missing']
+
+        # Remove "missing" from the build list in the config, because it sets policy; the policy is determined by the
+        # force_build_options
+        config_build_without_missing = [build for build in prebuilt_tool_config.build if build != 'missing']
+        config = prebuilt_tool_config._replace(build=config_build_without_missing)
+
         create_json = tmp_path / 'create.json'
         args = ['conan', 'create', tool_recipe_folder, f'{prebuilt_tool.package}@', '--update', '--json',
-                str(create_json)] + prebuilt_tool_config.install_options() + tool_options + force_build_options
+                str(create_json)] + config.install_options() + tool_options + force_build_options
         print(f'Creating package {prebuilt_tool.package}: {" ".join(args)}')
         subprocess.run(args, check=True)
         if upload_to:
