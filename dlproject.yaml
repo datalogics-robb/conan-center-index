@@ -198,7 +198,8 @@ config:
             - DebugTool
             - ReleaseTool
 
-    redhat:
+
+    redhat-x86_64:
         common: &redhatCommon
             build:
                 - missing
@@ -266,6 +267,33 @@ config:
             - DebugTool32
             - ReleaseTool32
 
+    redhat-aarch64:
+        common: &redhatARMCommon
+            build:
+                - missing
+        config:
+            Release: &redhatARMRelease
+                <<: *redhatARMCommon
+                build_folder: build-release
+                description: RedHat Release
+                profile_host:
+                    - llvm-toolset-7.0-armv8
+            Debug: &redhatARMDebug
+                <<: *redhatARMRelease
+                build_folder: build-debug
+                description: RedHat Debug
+                settings:
+                    - build_type=Debug
+        prebuilt_tools:
+            - cmake/3.21.4
+            - doxygen/1.9.1
+            - package: doxygen/1.9.1
+              options:
+                  - doxygen:enable_search=False
+            - ninja/1.10.2
+        prebuilt_tools_configs:
+            - Debug
+            - Release
 
     windows:
         # Can set the generator differently on a per-machine basis (but automatic is
