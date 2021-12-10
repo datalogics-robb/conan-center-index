@@ -333,7 +333,12 @@ config:
                     - build_type=Debug
         prebuilt_tools:
             - cmake/3.21.4
-            - doxygen/1.9.1
+            - package: doxygen/1.9.1
+              configs:
+                  # Search doesn't build for 32-bits, because xapian-core requires msys,
+                  # and msys complains about running on 32-bit
+                  - Debug
+                  - Release
             - package: doxygen/1.9.1
               options:
                   - doxygen:enable_search=False
