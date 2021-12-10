@@ -13,7 +13,8 @@ _config = dl_conan_build_tools.config.get_config()
 
 class Package(NamedTuple):
     package: str
-    options: List[str]
+    options: List[str] = list()
+    configs: List[str] = list()
 
     def __str__(self):
         result = self.package
@@ -37,8 +38,13 @@ def prebuilt_tool(request):
 
 @pytest.fixture(scope='package',
                 params=_config.get('prebuilt_tools_configs', []))
-def prebuilt_tool_config(request):
-    config = Config.from_name(request.param)
+def prebuilt_tool_config_name(request):
+    return request.param
+
+
+@pytest.fixture(scope='package')
+def prebuilt_tool_config(prebuilt_tool_config_name):
+    config = Config.from_name(prebuilt_tool_config_name)
     config.validate()
     config = config.normalize()
 
@@ -54,8 +60,11 @@ def tool_recipe_folder(prebuilt_tool):
 
 
 class TestBuildTools(object):
-    def test_build_tool(self, prebuilt_tool, prebuilt_tool_config, tool_recipe_folder, upload_to, force_build,
-                        tmp_path):
+    def test_build_tool(self, prebuilt_tool, prebuilt_tool_config_name, prebuilt_tool_config, tool_recipe_folder,
+                        upload_to, force_build, tmp_path):
+        if prebuilt_tool.configs and prebuilt_tool_config_name not in prebuilt_tool.configs:
+            pytest.skip(f'Skipping build because config named {prebuilt_tool_config_name} is not in the list of '
+                        f'configs for this package: {", ".join(prebuilt_tool.configs)}')
         tool_options = []
         for opt in prebuilt_tool.options:
             tool_options.append('--options:host')
