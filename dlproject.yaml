@@ -255,12 +255,21 @@ config:
                 settings:
                     - build_type=Debug
         prebuilt_tools:
-            - cmake/3.21.4
-            - doxygen/1.9.1
+            - package: cmake/3.21.4
+              configs:
+                  - DebugTool
+                  - ReleaseTool
+            - package: doxygen/1.9.1
+              configs:
+                  - DebugTool
+                  - ReleaseTool
             - package: doxygen/1.9.1
               options:
                   - doxygen:enable_search=False
-            - ninja/1.10.2
+            - package: ninja/1.10.2
+              configs:
+                  - DebugTool
+                  - ReleaseTool
         prebuilt_tools_configs:
             - DebugTool
             - ReleaseTool
