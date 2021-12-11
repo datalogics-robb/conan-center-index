@@ -361,6 +361,86 @@ config:
             - Debug32
             - Release32
 
+    aix:
+        common: &aixCommon
+            build:
+                - missing
+        config:
+            Release: &aixRelease
+                <<: *aixCommon
+                build_folder: build-release
+                description: AIX Release
+                profile_host: gcc-8-aix71-64
+            Debug: &aixDebug
+                <<: *aixRelease
+                build_folder: build-debug
+                description: AIX Debug
+                settings:
+                    - build_type=Debug
+            Release32: &aixRelease32
+                <<: *aixRelease
+                build_folder: build-release-32
+                description: AIX Release 32
+                profile_host: gcc-8-aix71-32
+            Debug32: &aixDebug32
+                <<: *aixRelease32
+                build_folder: build-debug-32
+                description: AIX Debug 32
+                settings:
+                    - build_type=Debug
+        prebuilt_tools:
+            - cmake/3.21.4
+            - doxygen/1.9.1
+            - package: doxygen/1.9.1
+              options:
+                  - doxygen:enable_search=False
+            - ninja/1.10.2
+        prebuilt_tools_configs:
+            - Debug
+            - Release
+            - Debug32
+            - Release32
+
+    sunos:
+        common: &sparcCommon
+            build:
+                - missing
+        config:
+            Release: &sparcRelease
+                <<: *sparcCommon
+                build_folder: build-release
+                description: Sparc Release
+                profile_host: gcc-9-sparc-solaris
+            Debug: &sparcDebug
+                <<: *sparcRelease
+                build_folder: build-debug
+                description: Sparc Debug
+                settings:
+                    - build_type=Debug
+            Release32: &sparcRelease32
+                <<: *sparcRelease
+                build_folder: build-release-32
+                description: Sparc Release 32
+                profile_host: gcc-9-sparc32-solaris
+            Debug32: &sparcDebug32
+                <<: *sparcRelease32
+                build_folder: build-debug-32
+                description: Sparc Debug 32
+                settings:
+                    - build_type=Debug
+        prebuilt_tools:
+            - cmake/3.21.4
+            - doxygen/1.9.1
+            - package: doxygen/1.9.1
+              options:
+                  - doxygen:enable_search=False
+            - ninja/1.10.2
+        prebuilt_tools_configs:
+            - Debug
+            - Release
+            - Debug32
+            - Release32
+
     byhost:
         # Configs based on hostname.
         # These are applied last. Consider this for only the most extreme cases
