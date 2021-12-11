@@ -248,6 +248,9 @@ config:
                 description: RedHat Release Tool 32
                 settings:
                     - arch=x86
+                    - bison:arch=x86_64
+                    - flex:arch=x86_64
+                    - m4:arch=x86_64
             DebugTool32: &redhatDebugTool32
                 <<: *redhatReleaseTool32
                 build_folder: build-debug-tool-32
