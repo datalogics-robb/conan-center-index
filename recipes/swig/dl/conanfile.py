@@ -103,6 +103,12 @@ class SwigConan(ConanFile):
             # MSVC canonical names aren't understood
             host, build = False, False
 
+        # DL: Old versions of swig-ccache needed yodl2man to build, which isn't
+        # available. We don't need ccache anyway.
+        if str(self.version) < tools.Version('4.0.0'):
+            self.output.warn("Old versions of SWIG need yodl2man to create ccache-swig. Disabling ccache-swig.")
+            args.append("--disable-ccache")
+
         if self.settings.os == "Macos" and self.settings.arch == "armv8":
             # FIXME: Apple ARM should be handled by build helpers
             autotools.flags.append("-arch arm64")
