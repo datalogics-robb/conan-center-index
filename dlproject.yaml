@@ -390,10 +390,18 @@ config:
                     - build_type=Debug
         prebuilt_tools:
             - cmake/3.21.4
-            - doxygen/1.9.1
+            - package: doxygen/1.9.1
+              # We don't build DLE on 32-bit AIX, so we don't need Doxygen
+              configs:
+                  - Debug
+                  - Release
             - package: doxygen/1.9.1
               options:
                   - doxygen:enable_search=False
+                  # We don't build DLE on 32-bit AIX, so we don't need Doxygen
+              configs:
+                  - Debug
+                  - Release
             - ninja/1.10.2
         prebuilt_tools_configs:
             - Debug
