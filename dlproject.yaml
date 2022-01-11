@@ -161,6 +161,13 @@ config:
             build:
                 - missing
         config:
+            tools_settings:
+                # When building tools, the build_requirements of the tools can all
+                # be the release version for the main host architecture, provided
+                # they don't have a library component.
+                settings:
+                    - m4:build_type=Release
+                    - automake:build_type=Release
             Release: &macOSRelease
                 <<: *macOSCommon
                 build_folder: build-release
@@ -175,12 +182,15 @@ config:
                     - build_type=Debug
             ReleaseTool: &macOSReleaseTool
                 <<: *macOSCommon
+                include:
+                    - tools_settings
                 build_folder: build-release
                 description: macOS Release
                 profile_host:
                     - apple-clang-12.0-macos-10.9
             DebugTool: &macOSDebugTool
-                <<: *macOSReleaseTool
+                include:
+                    - ReleaseTool
                 build_folder: build
                 description: macOS Debug
                 settings:
@@ -204,6 +214,15 @@ config:
             build:
                 - missing
         config:
+            tools_settings:
+                # When building tools, the build_requirements of the tools can all
+                # be the release version for the main host architecture, provided
+                # they don't have a library component.
+                settings:
+                    - m4:build_type=Release
+                    - m4:arch=x86_64
+                    - automake:build_type=Release
+                    - automake:arch=x86_64
             Release: &redhatRelease
                 <<: *redhatCommon
                 build_folder: build-release
@@ -232,27 +251,25 @@ config:
                     - build_type=Debug
             ReleaseTool: &redhatReleaseTool
                 <<: *redhatCommon
+                include: tools_settings
                 build_folder: build-release-tool
                 description: RedHat Release Tool
                 profile_host:
                     - devtoolset-7
             DebugTool: &redhatDebugTool
-                <<: *redhatReleaseTool
+                include: ReleaseTool
                 build_folder: build-debug-tool
                 description: RedHat Debug Tool
                 settings:
                     - build_type=Debug
             ReleaseTool32: &redhatReleaseTool32
-                <<: *redhatReleaseTool
+                include: ReleaseTool
                 build_folder: build-release-tool-32
                 description: RedHat Release Tool 32
                 settings:
                     - arch=x86
-                    - bison:arch=x86_64
-                    - flex:arch=x86_64
-                    - m4:arch=x86_64
             DebugTool32: &redhatDebugTool32
-                <<: *redhatReleaseTool32
+                include: ReleaseTool32
                 build_folder: build-debug-tool-32
                 description: RedHat Debug Tool 32
                 settings:
@@ -284,6 +301,13 @@ config:
             build:
                 - missing
         config:
+            tools_settings:
+                # When building tools, the build_requirements of the tools can all
+                # be the release version for the main host architecture, provided
+                # they don't have a library component.
+                settings:
+                    - m4:build_type=Release
+                    - automake:build_type=Release
             Release: &redhatARMRelease
                 <<: *redhatARMCommon
                 build_folder: build-release
@@ -296,6 +320,18 @@ config:
                 description: RedHat Debug
                 settings:
                     - build_type=Debug
+            ReleaseTool:
+                build_folder: build-release-tool
+                description: RedHat Release
+                include:
+                    - tools_settings
+                    - Release
+            DebugTool:
+                build_folder: build-debug-tool
+                description: RedHat Debug
+                include:
+                    - tools_settings
+                    - Debug
         prebuilt_tools:
             - cmake/3.21.4
             - doxygen/1.9.1
@@ -304,8 +340,8 @@ config:
                   - doxygen:enable_search=False
             - ninja/1.10.2
         prebuilt_tools_configs:
-            - Debug
-            - Release
+            - DebugTool
+            - ReleaseTool
 
     windows:
         # Can set the generator differently on a per-machine basis (but automatic is
@@ -316,56 +352,92 @@ config:
         # Can override packager build_tools on a per-platform basis:
         # packager:
         #     build_tools: build_tools_windows
-        common: &windowsCommon
-            profile_host: visual-studio-15
-            build:
-                - missing
         config:
-            Release: &windowsRelease
-                <<: *windowsCommon
+            tools_settings:
+                settings:
+                    # Use a 64-bit msys2 for all building
+                    - msys2:build_type=Release
+                    - msys2:arch=x86_64
+            Release:
                 build_folder: build-release
                 description: Windows Release
+                profile_host: visual-studio-15
+                build:
+                    - missing
             Debug: &windowsDebug
-                <<: *windowsRelease
+                include: Release
                 build_folder: build-debug
                 description: Windows Debug
                 settings:
                     - build_type=Debug
-            Release32: &windowsRelease32
-                <<: *windowsRelease
+            Release32:
+                include: Release
                 build_folder: build-release-32
                 description: Windows Release 32
                 settings:
                     - arch=x86
-            Debug32: &windowsDebug32
-                <<: *windowsRelease32
+            Debug32:
+                include: Release32
                 build_folder: build-debug-32
                 description: Windows Debug 32
                 settings:
                     - build_type=Debug
+            ReleaseTool:
+                build_folder: build-release-tool
+                description: Windows Release
+                include:
+                    - tools_settings
+                    - Release
+            DebugTool:
+                build_folder: build-debug-tool
+                description: Windows Debug Tool
+                include:
+                    - tools_settings
+                    - Debug
+            ReleaseTool32:
+                build_folder: build-release-32-tool
+                description: Windows Release 32 Tool
+                include:
+                    - tools_settings
+                    - Release32
+            DebugTool32:
+                build_folder: build-debug-32-tool
+                description: Windows Debug 32 Tool
+                include:
+                    - tools_settings
+                    - Debug32
+            default: *windowsDebug
         prebuilt_tools:
             - cmake/3.21.4
             - package: doxygen/1.9.1
               configs:
-                  # Search doesn't build for 32-bits, because xapian-core requires msys,
-                  # and msys complains about running on 32-bit
-                  - Debug
-                  - Release
+                # xapian-core doesn't work for cross-building x86_64 to x86
+                - DebugTool
+                - ReleaseTool
             - package: doxygen/1.9.1
               options:
                   - doxygen:enable_search=False
             - ninja/1.10.2
         prebuilt_tools_configs:
-            - Debug
-            - Release
-            - Debug32
-            - Release32
+            - DebugTool
+            - ReleaseTool
+            - DebugTool32
+            - ReleaseTool32
 
     aix:
         common: &aixCommon
             build:
                 - missing
         config:
+            tools_settings:
+                # When building tools, the build_requirements of the tools can all
+                # be the release version for the main host architecture, provided
+                # they don't have a library component.
+                settings:
+                    - m4:build_type=Release
+                    - m4:arch=ppc64
+                    - automake:build_type=Release
+                    - automake:arch=ppc64
             Release: &aixRelease
                 <<: *aixCommon
                 build_folder: build-release
@@ -388,6 +460,30 @@ config:
                 description: AIX Debug 32
                 settings:
                     - build_type=Debug
+            ReleaseTool:
+                build_folder: build-release-tool
+                description: AIX Release Tool
+                include:
+                    - tools_settings
+                    - Release
+            DebugTool:
+                build_folder: build-debug-tool
+                description: AIX Debug Tool
+                include:
+                    - tools_settings
+                    - Debug
+            ReleaseTool32:
+                build_folder: build-release-tool-32
+                description: AIX Release 32 Tool 32
+                include:
+                    - tools_settings
+                    - Release32
+            DebugTool32:
+                build_folder: build-debug-tool-32
+                description: AIX Debug 32 Tool
+                include:
+                    - tools_settings
+                    - Debug32
         prebuilt_tools:
             - cmake/3.21.4
             - package: doxygen/1.9.1
@@ -404,16 +500,25 @@ config:
                   - Release
             - ninja/1.10.2
         prebuilt_tools_configs:
-            - Debug
-            - Release
-            - Debug32
-            - Release32
+            - DebugTool
+            - ReleaseTool
+            - DebugTool32
+            - ReleaseTool32
 
     sunos:
         common: &sparcCommon
             build:
                 - missing
         config:
+            tools_settings:
+                # When building tools, the build_requirements of the tools can all
+                # be the release version for the main host architecture, provided
+                # they don't have a library component.
+                settings:
+                    - m4:build_type=Release
+                    - m4:arch=sparcv9
+                    - automake:build_type=Release
+                    - automake:arch=sparcv9
             Release: &sparcRelease
                 <<: *sparcCommon
                 build_folder: build-release
@@ -436,6 +541,30 @@ config:
                 description: Sparc Debug 32
                 settings:
                     - build_type=Debug
+            ReleaseTool:
+                build_folder: build-release-tool
+                description: Sparc Release Tool
+                include:
+                    - tools_settings
+                    - Release
+            DebugTool:
+                build_folder: build-debug-tool
+                description: Sparc Debug Tool
+                include:
+                    - tools_settings
+                    - Debug
+            ReleaseTool32:
+                build_folder: build-release-tool-32
+                description: Sparc Release 32 Tool 32
+                include:
+                    - tools_settings
+                    - Release32
+            DebugTool32:
+                build_folder: build-debug-tool-32
+                description: Sparc Debug 32 Tool
+                include:
+                    - tools_settings
+                    - Debug32
         prebuilt_tools:
             - cmake/3.21.4
             - doxygen/1.9.1
@@ -444,10 +573,10 @@ config:
                   - doxygen:enable_search=False
             - ninja/1.10.2
         prebuilt_tools_configs:
-            - Debug
-            - Release
-            - Debug32
-            - Release32
+            - DebugTool
+            - ReleaseTool
+            - DebugTool32
+            - ReleaseTool32
 
     byhost:
         # Configs based on hostname.
