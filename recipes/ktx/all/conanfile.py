@@ -1,7 +1,7 @@
 from conans import ConanFile, CMake, tools
 import os
 
-required_conan_version = ">=1.36.0"
+required_conan_version = ">=1.43.0"
 
 
 class KtxConan(ConanFile):
@@ -116,8 +116,15 @@ class KtxConan(ConanFile):
 
     def package_info(self):
         self.cpp_info.set_property("cmake_file_name", "Ktx")
-        self.cpp_info.set_property("cmake_target_name", "KTX")
-        self.cpp_info.components["libktx"].set_property("cmake_target_name", "ktx")
+        self.cpp_info.set_property("cmake_target_name", "KTX::ktx")
+
+        self.cpp_info.filenames["cmake_find_package"] = "Ktx"
+        self.cpp_info.filenames["cmake_find_package_multi"] = "Ktx"
+        self.cpp_info.names["cmake_find_package"] = "KTX"
+        self.cpp_info.names["cmake_find_package_multi"] = "KTX"
+        self.cpp_info.components["libktx"].names["cmake_find_package"] = "ktx"
+        self.cpp_info.components["libktx"].names["cmake_find_package_multi"] = "ktx"
+
         self.cpp_info.components["libktx"].libs = ["ktx"]
         self.cpp_info.components["libktx"].defines = [
             "KTX_FEATURE_KTX1", "KTX_FEATURE_KTX2", "KTX_FEATURE_WRITE"
