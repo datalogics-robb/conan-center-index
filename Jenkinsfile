@@ -39,7 +39,7 @@ pipeline {
     agent {
         node {
             label 'noarch-conan-center-index'
-            customWorkspace "workspace/${JOB_NAME}_noarch/"
+            customWorkspace "workspace/${JOB_NAME.replaceAll('/','_')}_noarch/"
         }
     }
     environment {
@@ -169,7 +169,7 @@ pipeline {
                 agent {
                     node {
                         label "${NODE}"
-                        customWorkspace "workspace/${JOB_NAME}/"
+                        customWorkspace "workspace/${JOB_NAME.replaceAll('/','_')}/"
                     }
                 }
                 when { anyOf {
