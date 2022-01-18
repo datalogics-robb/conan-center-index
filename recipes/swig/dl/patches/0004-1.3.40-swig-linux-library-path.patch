@@ -1,32 +1,38 @@
 diff --git a/Source/Modules/main.cxx b/Source/Modules/main.cxx
-index c824db6f9..ecd039cb6 100644
+index c824db6f9..0d8993695 100644
 --- a/Source/Modules/main.cxx
 +++ b/Source/Modules/main.cxx
-@@ -809,6 +809,23 @@ void SWIG_getoptions(int argc, char *argv[]) {
- 
- 
+@@ -805,9 +805,29 @@ void SWIG_getoptions(int argc, char *argv[]) {
+   }
+ }
  
 +#if defined(HAVE_UNISTD_H) && !defined(_WIN32)
 +#include <libgen.h>
 +#include <unistd.h>
-+
++#include <dlfcn.h>
+ 
 +static char *get_exe_path(void) {
-+  char buffer[PATH_MAX];
-+  ssize_t nb = readlink("/proc/self/exe", buffer, PATH_MAX);
-+  if (nb != -1) {
-+    buffer[nb] = '\0';
-+    dirname(buffer);
++  Dl_info info;
++  if (dladdr("main", &info)) {
++    char buffer[PATH_MAX];
++    char* res = NULL;
+ 
++    res = realpath(info.dli_fname, buffer);
++    if (!res) {
++      return Swig_copy_string(SWIG_LIB);
++    }
+ 
++    strcpy(buffer, dirname(buffer));
 +    strcat(buffer, "/swiglib");
 +    return Swig_copy_string(buffer);
 +  }
 +  return Swig_copy_string(SWIG_LIB);
 +}
 +#endif
-+
+ 
  int SWIG_main(int argc, char *argv[], Language *l) {
    char *c;
-   extern void Swig_print_xml(Node *obj, String *filename);
-@@ -869,9 +886,11 @@ int SWIG_main(int argc, char *argv[], Language *l) {
+@@ -869,9 +889,11 @@ int SWIG_main(int argc, char *argv[], Language *l) {
      char *p;
      if (!(GetModuleFileName(0, buf, MAX_PATH) == 0 || (p = strrchr(buf, '\\')) == 0)) {
        *(p + 1) = '\0';
