@@ -97,6 +97,10 @@ class TestBuildTools(object):
             for install in create_data['installed']:
                 recipe_id = install['recipe']['id']
                 ref = recipe_id.split('#')[0]
+                package = ref.split('/')[0]
+                if package == 'msys2':
+                    print(f'Not uploading {ref}, because it tends to modify itself during use.')
+                    continue
                 args = ['conan', 'upload', '-r', upload_to, f'{ref}@', '--all', '--check']
                 print(f'Uploading {ref}: {" ".join(args)}')
                 subprocess.run(args, check=True)
