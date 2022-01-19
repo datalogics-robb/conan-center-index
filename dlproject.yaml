@@ -374,7 +374,9 @@ config:
             Release:
                 build_folder: build-release
                 description: Windows Release
-                profile_host: visual-studio-15
+                profile_host: visual-studio-16
+                settings:
+                    compiler.toolset=v141
                 build:
                     - missing
             Debug: &windowsDebug
