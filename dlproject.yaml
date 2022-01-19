@@ -549,6 +549,8 @@ config:
                 build_folder: build-release
                 description: Sparc Release
                 profile_host: gcc-9-sparc-solaris
+                env_host:
+                    - PATH=[/opt/cmake-3.19/bin]
             Debug: &sparcDebug
                 <<: *sparcRelease
                 build_folder: build-debug
