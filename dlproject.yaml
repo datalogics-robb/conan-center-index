@@ -211,11 +211,11 @@ config:
             - ReleaseTool
 
 
-    redhat-x86_64:
+    redhat-6-x86_64:
         common: &redhatCommon
             build:
                 - missing
-        config:
+        config: &redhat6Config
             tools_settings:
                 # When building tools, the build_requirements of the tools can all
                 # be the release version for the main host architecture, provided
@@ -278,26 +278,24 @@ config:
                 description: RedHat Debug Tool 32
                 settings:
                     - build_type=Debug
-        prebuilt_tools:
+        prebuilt_tools: &redhat6Tools
             - package: cmake/3.21.4
-              configs:
-                  - DebugTool
-                  - ReleaseTool
             - package: doxygen/1.9.1
-              configs:
-                  - DebugTool
-                  - ReleaseTool
             - package: doxygen/1.9.1
               options:
                   - doxygen:enable_search=False
             - package: ninja/1.10.2
-              configs:
-                  - DebugTool
-                  - ReleaseTool
             - swig/1.3.40+dl.1
         prebuilt_tools_configs:
+            # Build 64-bit tools on RHEL 6, because they're used for 64-bit DLE for APDFL 15
             - DebugTool
             - ReleaseTool
+
+    redhat-7-x86_64:
+        config: *redhat6Config
+        prebuilt_tools: *redhat6Tools
+        prebuilt_tools_configs:
+            # Build 32-bit tools on RHEL 7; they don't build on RHEL 6
             - DebugTool32
             - ReleaseTool32
 
