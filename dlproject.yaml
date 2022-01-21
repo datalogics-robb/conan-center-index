@@ -161,14 +161,6 @@ config:
             build:
                 - missing
         config:
-            tools_settings:
-                # When building tools, the build_requirements of the tools can all
-                # be the release version for the main host architecture, provided
-                # they don't have a library component.
-                settings:
-                    - m4:build_type=Release
-                    - autoconf:build_type=Release
-                    - automake:build_type=Release
             Release: &macOSRelease
                 <<: *macOSCommon
                 build_folder: build-release
@@ -183,8 +175,6 @@ config:
                     - build_type=Debug
             ReleaseTool: &macOSReleaseTool
                 <<: *macOSCommon
-                include:
-                    - tools_settings
                 build_folder: build-release
                 description: macOS Release
                 profile_host:
@@ -216,17 +206,6 @@ config:
             build:
                 - missing
         config: &redhat6Config
-            tools_settings:
-                # When building tools, the build_requirements of the tools can all
-                # be the release version for the main host architecture, provided
-                # they don't have a library component.
-                settings:
-                    - m4:build_type=Release
-                    - m4:arch=x86_64
-                    - autoconf:build_type=Release
-                    - autoconf:arch=x86_64
-                    - automake:build_type=Release
-                    - automake:arch=x86_64
             Release: &redhatRelease
                 <<: *redhatCommon
                 build_folder: build-release
@@ -255,7 +234,6 @@ config:
                     - build_type=Debug
             ReleaseTool: &redhatReleaseTool
                 <<: *redhatCommon
-                include: tools_settings
                 build_folder: build-release-tool
                 description: RedHat Release Tool
                 profile_host:
@@ -304,14 +282,6 @@ config:
             build:
                 - missing
         config:
-            tools_settings:
-                # When building tools, the build_requirements of the tools can all
-                # be the release version for the main host architecture, provided
-                # they don't have a library component.
-                settings:
-                    - m4:build_type=Release
-                    - autoconf:build_type=Release
-                    - automake:build_type=Release
             Release: &redhatARMRelease
                 <<: *redhatARMCommon
                 build_folder: build-release
@@ -328,13 +298,11 @@ config:
                 build_folder: build-release-tool
                 description: RedHat Release
                 include:
-                    - tools_settings
                     - Release
             DebugTool:
                 build_folder: build-debug-tool
                 description: RedHat Debug
                 include:
-                    - tools_settings
                     - Debug
         prebuilt_tools:
             - cmake/3.21.4
@@ -358,17 +326,6 @@ config:
         # packager:
         #     build_tools: build_tools_windows
         config:
-            tools_settings:
-                settings:
-                    # Use a 64-bit msys2 for all building
-                    - msys2:build_type=Release
-                    - msys2:arch=x86_64
-                    - autoconf:build_type=Release
-                    - autoconf:arch=x86_64
-                    - automake:build_type=Release
-                    - automake:arch=x86_64
-                    - m4:build_type=Release
-                    - m4:arch=x86_64
             Release:
                 build_folder: build-release
                 description: Windows Release
@@ -399,25 +356,21 @@ config:
                 build_folder: build-release-tool
                 description: Windows Release
                 include:
-                    - tools_settings
                     - Release
             DebugTool:
                 build_folder: build-debug-tool
                 description: Windows Debug Tool
                 include:
-                    - tools_settings
                     - Debug
             ReleaseTool32:
                 build_folder: build-release-32-tool
                 description: Windows Release 32 Tool
                 include:
-                    - tools_settings
                     - Release32
             DebugTool32:
                 build_folder: build-debug-32-tool
                 description: Windows Debug 32 Tool
                 include:
-                    - tools_settings
                     - Debug32
             default: *windowsDebug
         prebuilt_tools:
@@ -443,17 +396,6 @@ config:
             build:
                 - missing
         config:
-            tools_settings:
-                # When building tools, the build_requirements of the tools can all
-                # be the release version for the main host architecture, provided
-                # they don't have a library component.
-                settings:
-                    - m4:build_type=Release
-                    - m4:arch=ppc64
-                    - autoconf:build_type=Release
-                    - autoconf:arch=ppc64
-                    - automake:build_type=Release
-                    - automake:arch=ppc64
             Release: &aixRelease
                 <<: *aixCommon
                 build_folder: build-release
@@ -480,25 +422,21 @@ config:
                 build_folder: build-release-tool
                 description: AIX Release Tool
                 include:
-                    - tools_settings
                     - Release
             DebugTool:
                 build_folder: build-debug-tool
                 description: AIX Debug Tool
                 include:
-                    - tools_settings
                     - Debug
             ReleaseTool32:
                 build_folder: build-release-tool-32
                 description: AIX Release 32 Tool 32
                 include:
-                    - tools_settings
                     - Release32
             DebugTool32:
                 build_folder: build-debug-tool-32
                 description: AIX Debug 32 Tool
                 include:
-                    - tools_settings
                     - Debug32
         prebuilt_tools:
             - cmake/3.21.4
@@ -531,17 +469,6 @@ config:
             build:
                 - missing
         config:
-            tools_settings:
-                # When building tools, the build_requirements of the tools can all
-                # be the release version for the main host architecture, provided
-                # they don't have a library component.
-                settings:
-                    - m4:build_type=Release
-                    - m4:arch=sparcv9
-                    - autoconf:build_type=Release
-                    - autoconf:arch=sparcv9
-                    - automake:build_type=Release
-                    - automake:arch=sparcv9
             Release: &sparcRelease
                 <<: *sparcCommon
                 build_folder: build-release
@@ -570,25 +497,21 @@ config:
                 build_folder: build-release-tool
                 description: Sparc Release Tool
                 include:
-                    - tools_settings
                     - Release
             DebugTool:
                 build_folder: build-debug-tool
                 description: Sparc Debug Tool
                 include:
-                    - tools_settings
                     - Debug
             ReleaseTool32:
                 build_folder: build-release-tool-32
                 description: Sparc Release 32 Tool 32
                 include:
-                    - tools_settings
                     - Release32
             DebugTool32:
                 build_folder: build-debug-tool-32
                 description: Sparc Debug 32 Tool
                 include:
-                    - tools_settings
                     - Debug32
         prebuilt_tools:
             - cmake/3.21.4
