@@ -197,7 +197,6 @@ config:
             - ninja/1.10.2
             - swig/1.3.40+dl.1
         prebuilt_tools_configs:
-            - DebugTool
             - ReleaseTool
 
 
@@ -266,16 +265,10 @@ config:
             - swig/1.3.40+dl.1
         prebuilt_tools_configs:
             # Build 64-bit tools on RHEL 6, because they're used for 64-bit DLE for APDFL 15
-            - DebugTool
             - ReleaseTool
 
     redhat-7-x86_64:
         config: *redhat6Config
-        prebuilt_tools: *redhat6Tools
-        prebuilt_tools_configs:
-            # Build 32-bit tools on RHEL 7; they don't build on RHEL 6
-            - DebugTool32
-            - ReleaseTool32
 
     redhat-aarch64:
         common: &redhatARMCommon
@@ -313,7 +306,6 @@ config:
             - ninja/1.10.2
             - swig/1.3.40+dl.1
         prebuilt_tools_configs:
-            - DebugTool
             - ReleaseTool
 
     windows:
@@ -378,7 +370,6 @@ config:
             - package: doxygen/1.9.1
               configs:
                 # xapian-core doesn't work for cross-building x86_64 to x86
-                - DebugTool
                 - ReleaseTool
             - package: doxygen/1.9.1
               options:
@@ -386,10 +377,7 @@ config:
             - ninja/1.10.2
             - swig/1.3.40+dl.1
         prebuilt_tools_configs:
-            - DebugTool
             - ReleaseTool
-            - DebugTool32
-            - ReleaseTool32
 
     aix:
         common: &aixCommon
@@ -441,28 +429,13 @@ config:
         prebuilt_tools:
             - cmake/3.21.4
             - package: doxygen/1.9.1
-              # We don't build DLE on 32-bit AIX, so we don't need Doxygen
-              configs:
-                  - Debug
-                  - Release
             - package: doxygen/1.9.1
               options:
                   - doxygen:enable_search=False
-                  # We don't build DLE on 32-bit AIX, so we don't need Doxygen
-              configs:
-                  - Debug
-                  - Release
             - ninja/1.10.2
             - package: swig/1.3.40+dl.1
-              # We don't build DLE on 32-bit AIX, so we don't need SWIG
-              configs:
-                  - Debug
-                  - Release
         prebuilt_tools_configs:
-            - DebugTool
             - ReleaseTool
-            - DebugTool32
-            - ReleaseTool32
 
     sunos:
         common: &sparcCommon
@@ -522,10 +495,7 @@ config:
             - ninja/1.10.2
             - swig/1.3.40+dl.1
         prebuilt_tools_configs:
-            - DebugTool
             - ReleaseTool
-            - DebugTool32
-            - ReleaseTool32
 
     byhost:
         # Configs based on hostname.
