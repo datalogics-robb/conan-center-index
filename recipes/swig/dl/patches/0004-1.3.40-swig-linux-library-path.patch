@@ -1,12 +1,12 @@
 diff --git a/Source/Modules/main.cxx b/Source/Modules/main.cxx
-index c824db6f9..0d8993695 100644
+index c824db6f9..007eef1ac 100644
 --- a/Source/Modules/main.cxx
 +++ b/Source/Modules/main.cxx
 @@ -805,9 +805,29 @@ void SWIG_getoptions(int argc, char *argv[]) {
    }
  }
  
-+#if defined(HAVE_UNISTD_H) && !defined(_WIN32)
++#if defined(HAVE_UNISTD_H) && !defined(_WIN32) && !defined(_AIX) && !defined(__sun__)
 +#include <libgen.h>
 +#include <unistd.h>
 +#include <dlfcn.h>
@@ -40,7 +40,7 @@ index c824db6f9..0d8993695 100644
 +      SwigLibWin = NewStringf("%sswiglib", buf);	// Native windows installation path
      }
      SwigLib = Swig_copy_string(SWIG_LIB_WIN_UNIX);	// Unix installation path using a drive letter (for msys/mingw)
-+#elif defined(HAVE_UNISTD_H) && !defined(_WIN32)
++#elif defined(HAVE_UNISTD_H) && !defined(_WIN32) && !defined(_AIX) && !defined(__sun__)
 +    SwigLib = get_exe_path();
  #else
      SwigLib = Swig_copy_string(SWIG_LIB);
