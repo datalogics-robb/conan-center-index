@@ -427,7 +427,9 @@ config:
                 include:
                     - Debug32
         prebuilt_tools:
-            - cmake/3.21.4
+            - package: cmake/3.21.4
+              options:
+                - cmake:with_openssl=False
             - package: doxygen/1.9.1
             - package: doxygen/1.9.1
               options:
@@ -487,7 +489,9 @@ config:
                 include:
                     - Debug32
         prebuilt_tools:
-            - cmake/3.21.4
+            - package: cmake/3.21.4
+              options:
+                - cmake:with_openssl=False
             - doxygen/1.9.1
             - package: doxygen/1.9.1
               options:
