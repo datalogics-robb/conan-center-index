@@ -2,6 +2,7 @@ from conans import ConanFile, tools, AutoToolsBuildEnvironment
 import contextlib
 import functools
 import os
+import shutil
 
 required_conan_version = ">=1.33.0"
 
@@ -122,6 +123,11 @@ class SwigConan(ConanFile):
 
         autotools.configure(args=args, configure_dir=self._source_subfolder,
                             host=host, build=build)
+        # DL: Old versions of SWIG deposited the swigp4.ml file in the build directory, but installed them from
+        # source
+        if str(self.version) < tools.Version('4.0.0'):
+            shutil.copy('Lib/ocaml/swigp4.ml', os.path.join(self._source_subfolder, 'Lib/ocaml/swigp4.ml'))
+
         return autotools
 
     def _patch_sources(self):
