@@ -431,7 +431,6 @@ config:
               options:
                 - cmake:with_openssl=False
             - package: doxygen/1.9.1
-            - package: doxygen/1.9.1
               options:
                   - doxygen:enable_search=False
             - ninja/1.10.2
