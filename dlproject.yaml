@@ -472,21 +472,31 @@ config:
                 description: Sparc Release Tool
                 include:
                     - Release
+                env:
+                    # Override to not contain -std=c99, which breaks m4 by turning off the 'asm' keyword
+                    - CFLAGS=-pthread -m64
             DebugTool:
                 build_folder: build-debug-tool
                 description: Sparc Debug Tool
                 include:
-                    - Debug
+                    - ReleaseTool
+                settings:
+                    - build_type=Debug
             ReleaseTool32:
                 build_folder: build-release-tool-32
                 description: Sparc Release 32 Tool 32
                 include:
                     - Release32
+                env:
+                    # Override to not contain -std=c99, which breaks m4 by turning off the 'asm' keyword
+                    - CFLAGS="-pthread -m32"
             DebugTool32:
                 build_folder: build-debug-tool-32
                 description: Sparc Debug 32 Tool
                 include:
-                    - Debug32
+                    - DebugTool32
+                settings:
+                    - build_type=Debug
         prebuilt_tools:
             - package: cmake/3.21.4
               options:
