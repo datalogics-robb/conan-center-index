@@ -88,7 +88,7 @@ class TestBuildTools(object):
         args = ['conan', 'create', tool_recipe_folder, f'{prebuilt_tool.package}@', '--update', '--json',
                 str(create_json)] + config.install_options() + tool_options + force_build_options
         print(f'Creating package {prebuilt_tool.package}: {" ".join(args)}')
-        subprocess.run(args, check=True)
+        subprocess.run(args, check=True, stderr=subprocess.STDOUT)
         if upload_to:
             # upload packages mentioned in the create.json, which includes requirements used to build
             # this package, if in fact it had to be built.
@@ -103,4 +103,4 @@ class TestBuildTools(object):
                     continue
                 args = ['conan', 'upload', '-r', upload_to, f'{ref}@', '--all', '--check']
                 print(f'Uploading {ref}: {" ".join(args)}')
-                subprocess.run(args, check=True)
+                subprocess.run(args, check=True, stderr=subprocess.STDOUT)
