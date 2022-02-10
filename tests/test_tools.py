@@ -1,4 +1,6 @@
 import json
+import os
+import platform
 import subprocess
 from typing import NamedTuple, List
 
@@ -42,9 +44,8 @@ def prebuilt_tool_config_name(request):
     return request.param
 
 
-@pytest.fixture(scope='package')
-def prebuilt_tool_config(prebuilt_tool_config_name):
-    config = Config.from_name(prebuilt_tool_config_name)
+def config_from_name(config_name):
+    config = Config.from_name(config_name)
     config.validate()
     config = config.normalize()
 
@@ -54,14 +55,52 @@ def prebuilt_tool_config(prebuilt_tool_config_name):
 
 
 @pytest.fixture(scope='package')
+def prebuilt_tool_config(prebuilt_tool_config_name):
+    return config_from_name(prebuilt_tool_config_name)
+
+
+@pytest.fixture(scope='package')
+def release_tool_config():
+    return config_from_name('ReleaseTool')
+
+
+@pytest.fixture(scope='package')
 def tool_recipe_folder(prebuilt_tool):
     package, version = prebuilt_tool.package.split('/')
     return recipes.versions_to_folders(package)[version]
 
 
+@pytest.fixture(scope='package')
+def msys_env(release_tool_config, tmpdir_factory):
+    if platform.system() == 'Windows':
+        msys2_dir = tmpdir_factory.mktemp('msys2_install')
+        args = ['conan', 'install', 'msys2/cci.latest@', '-if', msys2_dir, '-g', 'json']
+        args.extend(release_tool_config.install_options())
+        subprocess.run(args, check=True)
+        with open(msys2_dir / 'conanbuildinfo.json', 'r') as json_file:
+            conanbuildinfo = json.load(json_file)
+            return conanbuildinfo['deps_env_info']
+
+
+@pytest.fixture(scope='package')
+def msys_bin(msys_env):
+    """Return the value of MSYS_BIN from the msys2 package, or None if not on Windows"""
+    return (msys_env or {}).get('MSYS_BIN')
+
+
+@pytest.fixture(scope='package')
+def conan_env(msys_bin):
+    """Create an environment with extra variables for running Conan. This may include
+    setting a path to MSYS2 bash so that Conan doesn't try hooking into WSL (if installed)."""
+    env = os.environ.copy()
+    if msys_bin:
+        env['CONAN_BASH_PATH'] = os.path.join(msys_bin, 'bash.exe')
+    return env
+
+
 class TestBuildTools(object):
     def test_build_tool(self, prebuilt_tool, prebuilt_tool_config_name, prebuilt_tool_config, tool_recipe_folder,
-                        upload_to, force_build, tmp_path):
+                        upload_to, force_build, tmp_path, conan_env):
         if prebuilt_tool.configs and prebuilt_tool_config_name not in prebuilt_tool.configs:
             pytest.skip(f'Skipping build because config named {prebuilt_tool_config_name} is not in the list of '
                         f'configs for this package: {", ".join(prebuilt_tool.configs)}')
@@ -88,7 +127,7 @@ class TestBuildTools(object):
         args = ['conan', 'create', tool_recipe_folder, f'{prebuilt_tool.package}@', '--update', '--json',
                 str(create_json)] + config.install_options() + tool_options + force_build_options
         print(f'Creating package {prebuilt_tool.package}: {" ".join(args)}')
-        subprocess.run(args, check=True, stderr=subprocess.STDOUT)
+        subprocess.run(args, check=True, stderr=subprocess.STDOUT, env=conan_env)
         if upload_to:
             # upload packages mentioned in the create.json, which includes requirements used to build
             # this package, if in fact it had to be built.
@@ -103,4 +142,4 @@ class TestBuildTools(object):
                     continue
                 args = ['conan', 'upload', '-r', upload_to, f'{ref}@', '--all', '--check']
                 print(f'Uploading {ref}: {" ".join(args)}')
-                subprocess.run(args, check=True, stderr=subprocess.STDOUT)
+                subprocess.run(args, check=True, stderr=subprocess.STDOUT, env=conan_env)
