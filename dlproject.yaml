@@ -195,7 +195,7 @@ config:
               options:
                   - doxygen:enable_search=False
             - ninja/1.10.2
-            - b2/4.5.0
+            - b2/4.7.1
             - swig/1.3.40+dl.1
         prebuilt_tools_configs:
             - ReleaseTool
@@ -244,7 +244,7 @@ config:
               options:
                   - doxygen:enable_search=False
             - ninja/1.10.2
-            - b2/4.5.0
+            - b2/4.7.1
             - swig/1.3.40+dl.1
         prebuilt_tools_configs:
             - ReleaseTool
@@ -312,7 +312,7 @@ config:
               options:
                   - doxygen:enable_search=False
             - package: ninja/1.10.2
-            - b2/4.5.0
+            - b2/4.7.1
             - swig/1.3.40+dl.1
         prebuilt_tools_configs:
             # Build 64-bit tools on RHEL 6, because they're used for 64-bit DLE for APDFL 15
@@ -355,7 +355,7 @@ config:
               options:
                   - doxygen:enable_search=False
             - ninja/1.10.2
-            - b2/4.5.0
+            - b2/4.7.1
             - swig/1.3.40+dl.1
         prebuilt_tools_configs:
             - ReleaseTool
@@ -427,7 +427,7 @@ config:
               options:
                   - doxygen:enable_search=False
             - ninja/1.10.2
-            - b2/4.5.0
+            - b2/4.7.1
             - swig/1.3.40+dl.1
             - innoextract/1.9.0
         prebuilt_tools_configs:
@@ -488,7 +488,7 @@ config:
               options:
                   - doxygen:enable_search=False
             - ninja/1.10.2
-            - b2/4.5.0
+            - b2/4.7.1
             - package: swig/1.3.40+dl.1
         prebuilt_tools_configs:
             - ReleaseTool
@@ -561,7 +561,7 @@ config:
               options:
                   - doxygen:enable_search=False
             - ninja/1.10.2
-            - b2/4.5.0
+            - b2/4.7.1
             - swig/1.3.40+dl.1
         prebuilt_tools_configs:
             - ReleaseTool
