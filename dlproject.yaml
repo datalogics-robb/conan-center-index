@@ -399,23 +399,28 @@ config:
             ReleaseTool:
                 build_folder: build-release-tool
                 description: Windows Release
-                include:
-                    - Release
+                profile_host: visual-studio-16
             DebugTool:
                 build_folder: build-debug-tool
                 description: Windows Debug Tool
                 include:
-                    - Debug
+                    - ReleaseTool
+                settings:
+                    - build-type=Debug
             ReleaseTool32:
                 build_folder: build-release-32-tool
                 description: Windows Release 32 Tool
                 include:
-                    - Release32
+                    - ReleaseTool
+                settings:
+                    - arch=x86
             DebugTool32:
                 build_folder: build-debug-32-tool
                 description: Windows Debug 32 Tool
                 include:
-                    - Debug32
+                    - ReleaseTool32
+                settings:
+                    - build-type=Debug
             default: *windowsDebug
         prebuilt_tools:
             - cmake/3.21.4
