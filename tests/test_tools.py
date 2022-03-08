@@ -71,12 +71,31 @@ def tool_recipe_folder(prebuilt_tool):
 
 
 @pytest.fixture(scope='package')
-def msys_env(release_tool_config, tmpdir_factory):
+def msys_env(release_tool_config, tmpdir_factory, upload_to):
     if platform.system() == 'Windows':
         msys2_dir = tmpdir_factory.mktemp('msys2_install')
-        args = ['conan', 'install', 'msys2/cci.latest@', '-if', msys2_dir, '-g', 'json']
+        install_json = msys2_dir / 'install.json'
+        args = ['conan', 'install', 'msys2/cci.latest@', '-if', msys2_dir, '-g', 'json', '--build', 'missing',
+                '-j', install_json]
         args.extend(release_tool_config.install_options())
         subprocess.run(args, check=True)
+
+        # Upload msys2 if it was built, since it should still be clean
+        with open(install_json, 'r') as json_file:
+            install_data = json.load(json_file)
+        for install in install_data['installed']:
+            recipe_id = install['recipe']['id']
+            ref = recipe_id.split('#')[0]
+            package = ref.split('/')[0]
+            if package == 'msys2':
+                built = False
+                for package in install['packages']:
+                    built = built or package['built']
+                if built and upload_to:
+                    args = ['conan', 'upload', '-r', upload_to, f'{ref}@', '--all', '--check']
+                    print(f'Uploading {ref}: {" ".join(args)}')
+                    subprocess.run(args, check=True, stderr=subprocess.STDOUT)
+
         with open(msys2_dir / 'conanbuildinfo.json', 'r') as json_file:
             conanbuildinfo = json.load(json_file)
             return conanbuildinfo['deps_env_info']

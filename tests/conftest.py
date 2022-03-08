@@ -7,7 +7,7 @@ def pytest_addoption(parser):
                      help='Force a build of the package or the package with its requirements')
 
 
-@pytest.fixture
+@pytest.fixture(scope='package')
 def upload_to(request):
     return request.config.getoption('--upload-to')
 
