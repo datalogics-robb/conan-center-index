@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.9
 # -*- coding: utf-8 -*-
 import string
 import sys
@@ -9,9 +9,9 @@ import subprocess
 import platform
 import argparse
 
-if sys.version_info[:2] < (3, 6):
-    # Don't allow anything but Python 3.6 or higher
-    raise SystemError("Only Python 3.6+ is allowed")
+if sys.version_info[:2] < (3, 9):
+    # Don't allow anything but Python 3.9 or higher
+    raise SystemError("Only Python 3.9+ is allowed")
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 join = os.path.join
