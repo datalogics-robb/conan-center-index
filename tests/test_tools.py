@@ -1,6 +1,7 @@
 import json
 import os
 import platform
+import semver
 import subprocess
 from typing import NamedTuple, List
 
@@ -26,13 +27,38 @@ class Package(NamedTuple):
 
     @classmethod
     def from_str_or_dict(cls, str_or_dict):
+        """Create a package from a string or dict."""
         if isinstance(str_or_dict, str):
             return cls(str_or_dict, [])
         return cls(**str_or_dict)
 
+    @classmethod
+    def create_resolved(cls, str_or_dict):
+        """Create a package from a string or dict, and resolve ranges."""
+        return cls.from_str_or_dict(str_or_dict).resolve_ranges()
+
+    def resolve_ranges(self):
+        """Check if the package has a range expression, and resolve it if necessary."""
+        package, range = self.package.split('/', maxsplit=1)
+        if range.startswith('[') and range.endswith(']'):
+            versions = recipes.versions_to_folders(package).keys()
+            range = range[1:-1]  # strip off brackets
+            # Could call conans.client.graph.range_resolver.satisfying() here, but
+            # avoiding using Conan internals. That means not supporting loose or include_prerelease
+            # for now. In Conan, loose is the default.
+            resolved_version = semver.max_satisfying(versions, range, loose=True, include_prerelease=False)
+            if resolved_version is None:
+                print(f'*** No range resolution for {self.package}')
+                return self
+            resolved_package = f'{package}/{resolved_version}'
+            print(f'Resolved {self.package} to {resolved_package}')
+            return Package(resolved_package, self.options, self.configs)
+        else:
+            return self
+
 
 @pytest.fixture(scope='package',
-                params=[Package.from_str_or_dict(entry) for entry in _config.get('prebuilt_tools', [])],
+                params=[Package.create_resolved(entry) for entry in _config.get('prebuilt_tools', [])],
                 ids=lambda param: str(param))
 def prebuilt_tool(request):
     return request.param
@@ -67,7 +93,7 @@ def release_tool_config():
 @pytest.fixture(scope='package')
 def tool_recipe_folder(prebuilt_tool):
     package, version = prebuilt_tool.package.split('/')
-    return recipes.versions_to_folders(package)[version]
+    return recipes.versions_to_folders(package).get(version)
 
 
 @pytest.fixture(scope='package')
@@ -123,6 +149,12 @@ class TestBuildTools(object):
         if prebuilt_tool.configs and prebuilt_tool_config_name not in prebuilt_tool.configs:
             pytest.skip(f'Skipping build because config named {prebuilt_tool_config_name} is not in the list of '
                         f'configs for this package: {", ".join(prebuilt_tool.configs)}')
+
+        package_name, package_version = prebuilt_tool.package.split('/', maxsplit=1)
+        assert not package_version.startswith('[') and not package_version.endswith(']'), 'version range must have ' \
+                                                                                          'been resolved'
+        assert tool_recipe_folder is not None, 'the recipe folder must be found'
+
         tool_options = []
         for opt in prebuilt_tool.options:
             tool_options.append('--options:host')
@@ -130,7 +162,7 @@ class TestBuildTools(object):
         force_build_options = []
 
         if force_build == 'package':
-            force_build_options = ['--build', prebuilt_tool.package.split('/', maxsplit=1)[0],
+            force_build_options = ['--build', package_name,
                                    '--build', 'missing']
         elif force_build == 'with-requirements':
             force_build_options = ['--build']
