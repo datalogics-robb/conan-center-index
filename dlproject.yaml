@@ -189,13 +189,13 @@ config:
         # If the entry is a string, it's taken to be the package name,
         # else the entry can be a dictionary of package name and options
         prebuilt_tools:
-            - cmake/3.21.4
+            - cmake/[~3.21.0]
             - doxygen/1.9.1
             - package: doxygen/1.9.1
               options:
                   - doxygen:enable_search=False
-            - ninja/1.10.2
-            - ninja/1.11.0
+            - ninja/[~1.10.0]
+            - ninja/[>=1.0.0]
             - b2/4.8.0
             - swig/1.3.40+dl.1
         prebuilt_tools_configs:
@@ -239,13 +239,13 @@ config:
         # If the entry is a string, it's taken to be the package name,
         # else the entry can be a dictionary of package name and options
         prebuilt_tools:
-            - cmake/3.21.4
+            - cmake/[~3.21.0]
             - doxygen/1.9.1
             - package: doxygen/1.9.1
               options:
                   - doxygen:enable_search=False
-            - ninja/1.10.2
-            - ninja/1.11.0
+            - ninja/[~1.10.0]
+            - ninja/[>=1.0.0]
             - b2/4.8.0
             - swig/1.3.40+dl.1
         prebuilt_tools_configs:
@@ -308,13 +308,13 @@ config:
                 settings:
                     - build_type=Debug
         prebuilt_tools: &redhat6Tools
-            - package: cmake/3.21.4
+            - package: cmake/[~3.21.0]
             - package: doxygen/1.9.1
             - package: doxygen/1.9.1
               options:
                   - doxygen:enable_search=False
-            - package: ninja/1.10.2
-            - ninja/1.11.0
+            - package: ninja/[~1.10.0]
+            - ninja/[>=1.0.0]
             - b2/4.8.0
             - swig/1.3.40+dl.1
         prebuilt_tools_configs:
@@ -352,13 +352,13 @@ config:
                 include:
                     - Debug
         prebuilt_tools:
-            - cmake/3.21.4
+            - cmake/[~3.21.0]
             - doxygen/1.9.1
             - package: doxygen/1.9.1
               options:
                   - doxygen:enable_search=False
-            - ninja/1.10.2
-            - ninja/1.11.0
+            - ninja/[~1.10.0]
+            - ninja/[>=1.0.0]
             - b2/4.8.0
             - swig/1.3.40+dl.1
         prebuilt_tools_configs:
@@ -427,7 +427,7 @@ config:
                     - build-type=Debug
             default: *windowsDebug
         prebuilt_tools:
-            - cmake/3.21.4
+            - cmake/[~3.21.0]
             - package: doxygen/1.9.1
               configs:
                 # xapian-core doesn't work for cross-building x86_64 to x86
@@ -435,8 +435,8 @@ config:
             - package: doxygen/1.9.1
               options:
                   - doxygen:enable_search=False
-            - ninja/1.10.2
-            - ninja/1.11.0
+            - ninja/[~1.10.0]
+            - ninja/[>=1.0.0]
             - b2/4.8.0
             - swig/1.3.40+dl.1
             - innoextract/1.9.0
@@ -491,14 +491,14 @@ config:
                 include:
                     - Debug32
         prebuilt_tools:
-            - package: cmake/3.21.4
+            - package: cmake/[~3.21.0]
               options:
                 - cmake:with_openssl=False
             - package: doxygen/1.9.1
               options:
                   - doxygen:enable_search=False
-            - ninja/1.10.2
-            - ninja/1.11.0
+            - ninja/[~1.10.0]
+            - ninja/[>=1.0.0]
             - b2/4.8.0
             - package: swig/1.3.40+dl.1
         prebuilt_tools_configs:
@@ -564,15 +564,15 @@ config:
                 settings:
                     - build_type=Debug
         prebuilt_tools:
-            - package: cmake/3.21.4
+            - package: cmake/[~3.21.0]
               options:
                 - cmake:with_openssl=False
             - doxygen/1.9.1
             - package: doxygen/1.9.1
               options:
                   - doxygen:enable_search=False
-            - ninja/1.10.2
-            - ninja/1.11.0
+            - ninja/[~1.10.0]
+            - ninja/[>=1.0.0]
             - b2/4.8.0
             - swig/1.3.40+dl.1
         prebuilt_tools_configs:
