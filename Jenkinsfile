@@ -154,11 +154,14 @@ pipeline {
                     if (params.UPLOAD_ALL_RECIPES) {
                         range = '--all'
                     } else {
+                        // make sure conan-io is available and up-to-date
+                        sh "git remote | grep conan-io || git remote add conan-io https://github.com/conan-io/conan-center-index.git"
+                        sh "git fetch conan-io"
                         // assuming this is due to a merge, upload recipes
                         // modified since just before the last merge. This is an
                         // incremental update to recipes, and will be much faster
                         // than uploading all 1100+ recipes.
-                        range = "--since-before-last-merge"
+                        range = "--since-before-last-merge --since-merge-from-branch=conan-io/master"
                     }
                     sh ". ${ENV_LOC['noarch']}/bin/activate; invoke upload-recipes --remote ${remote} ${range}"
                 }
