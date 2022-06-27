@@ -13,12 +13,15 @@ from invoke.tasks import Task, task
             'since-commit': 'upload all packages in recipes folder changed since COMMIT',
             'since-before-last-merge': 'upload all packages in recipes folder changed since just before the most '
                                        'recent merge (this is useful for automated tools)',
+            'since-merge-from-branch': 'upload packages changed since a merge from the given branch',
+            'merges': 'number of merges to look back for since-merge-from-branch, default 2',
             'parallel': 'run uploads in parallel (default)',
             'upload': 'upload the recipe (default) (otherwise, just does the exports)'
             },
       iterable=['package'])
 def upload_recipes(ctx, remote='conan-center-dl-staging', package=None, all=False, since_commit=None,
-                   since_before_last_merge=False, parallel=True, upload=True):
+                   since_before_last_merge=False, since_merge_from_branch=None, merges=2,
+                   parallel=True, upload=True):
     """Export and upload the named recipes to the given remote.
 
     Exports and uploads all the versions of the selected recipes to the remote."""
@@ -29,6 +32,25 @@ def upload_recipes(ctx, remote='conan-center-dl-staging', package=None, all=Fals
         ctx.run(f'git diff --name-only {since_commit} -- recipes', out_stream=stm, pty=False, dry=False)
         lines = stm.getvalue().strip('\n').split('\n')
         packages.update(path.split('/')[1] for path in lines if path)
+
+    def search_branch_merge():
+        # Get all revs from branch
+        stm = io.StringIO()
+        ctx.run(f'git rev-list {since_merge_from_branch}', out_stream=stm, pty=False, dry=False)
+        branch_revs = set(stm.getvalue().strip('\n').split('\n'))
+
+        # Get all merges, and all their parents
+        stm = io.StringIO()
+        ctx.run("git log --min-parents=2 --pretty='%H %P'", out_stream=stm, pty=False, dry=False)
+        merges_seen = 0
+        for line in stm.getvalue().strip('\n').split('\n'):
+            refs = line.split()
+            merge_commit = refs[0]
+            parents = refs[1:]
+            if set(parents).intersection(branch_revs):
+                merges_seen += 1
+            if merges_seen == merges:
+                return merge_commit
 
     packages.update(package or [])
     if all:
@@ -43,6 +65,9 @@ def upload_recipes(ctx, remote='conan-center-dl-staging', package=None, all=Fals
         commit = stm.getvalue().strip('\n')
         # {commit}~1 is the first parent of {commit}; see https://git-scm.com/docs/git-rev-parse#_specifying_revisions
         update_since_commit(f'{commit}~1')
+    if since_merge_from_branch:
+        commit = search_branch_merge()
+        update_since_commit(commit)
 
     sorted_packages = sorted(packages)
     print('*** Uploading:')
