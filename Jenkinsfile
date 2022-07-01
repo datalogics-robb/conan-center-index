@@ -15,7 +15,6 @@ pipeline {
     parameters {
         choice(name: 'PLATFORM_FILTER',
                choices: ['all',
-                         'aix-conan-center-index',
                          'linux-x64-rhws6-conan-center-index',
                          'linux-x64-rhel7-conan-center-index',
                          'linux-arm-conan-center-index',
@@ -182,8 +181,7 @@ pipeline {
                 axes {
                     axis {
                         name 'NODE'
-                        values 'aix-conan-center-index',
-                            'linux-x64-rhws6-conan-center-index',
+                        values 'linux-x64-rhws6-conan-center-index',
                             'linux-x64-rhel7-conan-center-index',
                             'linux-arm-conan-center-index',
                             'mac-x64-conan-center-index',
