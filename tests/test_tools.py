@@ -2,6 +2,7 @@ import json
 import os
 import platform
 import semver
+import shutil
 import subprocess
 from typing import NamedTuple, List
 
@@ -139,7 +140,14 @@ def conan_env(msys_bin):
     setting a path to MSYS2 bash so that Conan doesn't try hooking into WSL (if installed)."""
     env = os.environ.copy()
     if msys_bin:
-        env['CONAN_BASH_PATH'] = os.path.join(msys_bin, 'bash.exe')
+        # It turns out that there's really no workaround that works with WSL2 installed;
+        # see the discussion at https://github.com/conan-io/conan-center-index/issues/7944
+        # Either autoconf doesn't build (without CONAN_BASH_PATH) or its test_package doesn't
+        # build (with CONAN_BASH_PATH), so maybe the best solution is to inform the user that
+        # WSL2 should not be enabled.
+        # env['CONAN_BASH_PATH'] = os.path.join(msys_bin, 'bash.exe')
+        bash = (shutil.which('bash') or '').lower()
+        assert bash != r'c:\windows\system32\bash.exe', "Building on Windows doesn't work with WSL2 installed"
     return env
 
 
