@@ -145,11 +145,13 @@ pipeline {
             }
             steps {
                 script {
+                    def remote
                     if (env.BRANCH_NAME =~ 'master*') {
                         remote = 'conan-center-dl'
                     } else {
                         remote = 'conan-center-dl-staging'
                     }
+                    def range
                     if (params.UPLOAD_ALL_RECIPES) {
                         range = '--all'
                     } else {
@@ -287,12 +289,14 @@ pipeline {
                         }
                         steps {
                             script {
+                                def remote
                                 if (env.BRANCH_NAME =~ 'master*') {
                                     remote = 'conan-center-dl'
                                 } else {
                                     remote = 'conan-center-dl-staging'
                                 }
-                                short_node = NODE.replace('-conan-center-index', '')
+                                def short_node = NODE.replace('-conan-center-index', '')
+                                def force_build
                                 if (params.FORCE_TOOL_BUILD_WITH_REQUIREMENTS) {
                                     force_build = '--force-build with-requirements'
                                 } else if (params.FORCE_TOOL_BUILD) {
@@ -300,7 +304,7 @@ pipeline {
                                 } else {
                                     force_build = ''
                                 }
-                                pytest_command = "pytest -k build_tool ${force_build} --upload-to ${remote} --junitxml=build-tools.xml --html=${short_node}-build-tools.html"
+                                def pytest_command = "pytest -k build_tool ${force_build} --upload-to ${remote} --junitxml=build-tools.xml --html=${short_node}-build-tools.html"
                                 if (isUnix()) {
                                     catchError(message: 'pytest had errors', stageResult: 'FAILURE') {
                                         script {
