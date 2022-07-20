@@ -59,7 +59,7 @@ pipeline {
         stage('Clean/reset Git checkout for release') {
             when {
                 anyOf {
-                    expression { params.CLEAN_WORKSPACE == 'true' }
+                    expression { params.CLEAN_WORKSPACE }
                 }
             }
             steps {
@@ -200,7 +200,7 @@ pipeline {
                     stage('Clean/reset Git checkout for release') {
                         when {
                             anyOf {
-                                expression { params.CLEAN_WORKSPACE == 'true' }
+                                expression { params.CLEAN_WORKSPACE }
                             }
                         }
                         steps {
