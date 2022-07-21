@@ -116,7 +116,10 @@ def upload_one_package_name(ctx, package_name, remote, upload=True):
                     folder = os.path.join(recipe_folder, version)
                     ctx.run(f'conan export {folder} {package_name}/{version}@')
     if upload:
-        ctx.run(f'conan upload -r {remote} {package_name} --confirm')
+        # Force upload to make sure that if there has been back-and-forth changes
+        # to the branch, the current recipe rises to the top of the revisions
+        # sorted by date.
+        ctx.run(f'conan upload -r {remote} {package_name} --force --confirm')
 
 
 tasks = []
