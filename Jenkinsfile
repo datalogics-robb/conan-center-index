@@ -68,11 +68,18 @@ pipeline {
                     // Ensure that the checkout is clean and any changes
                     // to .gitattributes and .gitignore have been taken
                     // into effect
+                    //
+                    // The extra -f causes Git to delete even embedded Git
+                    // repositories, which can happen if the Conan cache
+                    // is in ./.conan, and a recipe (like SWIG) checks out
+                    // its code with Git.
+                    //
+                    // See: https://git-scm.com/docs/git-clean#Documentation/git-clean.txt--f
                     if (isUnix()) {
                         sh """
                         git rm -q -r .
                         git reset --hard HEAD
-                        git clean -fdx
+                        git clean -f -fdx
                         """
                     } else {
                         // On Windows, 'git clean' can't handle long paths in .conan,
@@ -81,7 +88,7 @@ pipeline {
                         if exist ${WORKSPACE}\\.conan\\ rmdir/s/q ${WORKSPACE}\\.conan
                             git rm -q -r .
                             git reset --hard HEAD
-                            git clean -fdx
+                            git clean -f -fdx
                             """
                     }
                 }
@@ -213,7 +220,7 @@ pipeline {
                                     sh """
                                         git rm -q -r .
                                         git reset --hard HEAD
-                                        git clean -fdx
+                                        git clean -f -fdx
                                         """
                                 } else {
                                     // On Windows, 'git clean' can't handle long paths in .conan,
@@ -222,7 +229,7 @@ pipeline {
                                         if exist ${WORKSPACE}\\.conan\\ rmdir/s/q ${WORKSPACE}\\.conan
                                         git rm -q -r .
                                         git reset --hard HEAD
-                                        git clean -fdx
+                                        git clean -f -fdx
                                         """
                                 }
                             }
