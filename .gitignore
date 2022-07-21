@@ -451,3 +451,5 @@ requirements.txt
 # Test outputs
 /test-report.xml
 /test-report.html
+
+/.mkenv
