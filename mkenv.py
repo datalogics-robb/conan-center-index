@@ -1,127 +1,89 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-import string
-import sys
+import importlib
 import os
-
-import venv
 import subprocess
-import platform
-import argparse
+import sys
 
-if sys.version_info[:2] < (3, 6):
-    # Don't allow anything but Python 3.6 or higher
-    raise SystemError("Only Python 3.6+ is allowed")
+if sys.version_info[:2] < (3, 9):
+    # Don't allow anything but Python 3.9 or higher
+    raise SystemError("Only Python 3.9+ is allowed")
 
+MKENV_IMPL = 'mkenv_impl'
 HERE = os.path.dirname(os.path.abspath(__file__))
-join = os.path.join
-lower_node = platform.node().split('.')[0].lower().replace(' ', '-')
-# See https://stackoverflow.com/a/10839538, but use ASCII letters
-allowed = string.digits + string.ascii_letters + '-_'
-filtered_node = ''.join(filter(allowed.__contains__, lower_node))
-HOME_DIR = join(HERE, f'python-env-{filtered_node}')
+MKENV_SUBDIR = '.mkenv'
+MKENV_REPO = os.environ.get('DL_MKENV_REPO', 'git@octocat.dlogics.com:datalogics/mkenv.git')
+MKENV_BRANCH = os.environ.get('DL_MKENV_BRANCH', 'main')
+DL_MKENV_ENVIRONMENT_OVERRIDE = 'DL_MKENV_REPO' in os.environ or 'DL_MKENV_BRANCH' in os.environ
+# The oldest Git v2 we have on our machines is 2.3, and it seems to work for mkenv.
+GIT_REQUIRED = (2, 3)
 
 
-def install_project_requirements(output_route):
-    """
-    Install the project's required modules via pip-tools.
-    """
-    print('Checking required packages are installed...')
+def run(command_args, verbose=False, check=True, capture_output=False, *args, **kwargs):
+    if verbose:
+        print(' '.join(command_args), file=sys.stderr)
+    redirect_stderr = subprocess.PIPE if capture_output else None
+    redirect_stdout = subprocess.PIPE if capture_output else sys.stderr
+    return subprocess.run(command_args, check=check, stdout=redirect_stdout, stderr=redirect_stderr,
+                          *args, **kwargs)
 
-    activation_path = HOME_DIR
-    execut = ''
-    if windows():
-        execut = '.exe'
-        activation_path = os.path.join(activation_path, 'Scripts')
-    else:
-        activation_path = os.path.join(activation_path, 'bin')
 
+def get_mkenv_impl_from_git():
+    old_sys_path = sys.path.copy()
     try:
-        print('Update pip ... ')
-        # update pip so the other steps won't fail with a warning to update pip
-        # Also, install pip-tools for better dependency management
-        subprocess.check_call([os.path.join(activation_path, 'python' + execut),
-                               '-m', 'pip', 'install', '--upgrade', 'pip', 'pip-tools',
-                               'wheel'],
-                              stdout=output_route, stderr=subprocess.STDOUT)
-    except subprocess.CalledProcessError:
-        print('ERROR: Could not install/upgrade pip, pip-tools, and wheel')
-        raise
-    except PermissionError:
-        print('ERROR: Could not install pip due to permission error', activation_path)
-        raise
+        mkenv_dir = os.path.join(HERE, MKENV_SUBDIR)
+        # snipe the verbose flag from the argv to decide how chatty to be about the
+        # git commands
+        verbose = '-v' in sys.argv or '--verbose' in sys.argv
 
-    try:
-        pip_compile_cmd = os.path.join(activation_path, 'pip-compile' + execut)
-        pip_sync_cmd = os.path.join(activation_path, 'pip-sync' + execut)
-        print('Installing / Refreshing required packages... ')
-        artifactory_url = 'http://artifactory.dlogics.com:8081/artifactory'
-        index_url = artifactory_url + '/api/pypi/pypi/simple'
-        artifactory = 'artifactory.dlogics.com'
-        print('Dependency resolution...')
-        # Avoid PEP 517. This gets around a problem with system_site_packages,
-        # pip >= 19.0.0, and older setuptools.
-        # See: https://github.com/pypa/pip/issues/6264#issuecomment-470498695
-        # in pip-tools, this is the --no-build-isolation option
-        subprocess.check_call([pip_compile_cmd, '--no-build-isolation', '--upgrade', '-i',
-                               index_url, '--trusted-host',
-                               artifactory],
-                              stdout=output_route, stderr=subprocess.STDOUT)
-        print('Installing/upgrading packages...')
-        subprocess.check_call([pip_sync_cmd, '-i',
-                               index_url, '--trusted-host',
-                               artifactory],
-                              stdout=output_route, stderr=subprocess.STDOUT)
+        # Check git version
+        completed = run(['git', 'version'], capture_output=True, check=True)
+        git_version = completed.stdout.decode().strip().split()[2]
+        # Windows has string stuff after the first three numbers, hence the [:3]
+        git_version_split = [int(x) for x in git_version.split('.')[:3]]
+        if tuple(git_version_split[:len(GIT_REQUIRED)]) < GIT_REQUIRED:
+            ver_string = '.'.join(str(x) for x in GIT_REQUIRED)
+            sys.exit(f'*** Git version {ver_string} or newer required, found {git_version}; '
+                     f' older versions are no longer supported')
 
-    except subprocess.CalledProcessError:
-        print('ERROR: Could not install required packages using ', pip_compile_cmd, ' and ', pip_sync_cmd)
-        raise
-    except PermissionError:
-        print('ERROR: Could not run pip-tools due to permission error', activation_path)
-        raise
-
-    print('Packages up to date...')
-    activate_cmd = (f' . .{HOME_DIR}/bin/activate\n' if not windows() else
-                    f' {HOME_DIR}\\Scripts\\activate.bat\n')
-    print('\n Now activate the virtual environment with:\n    ' + activate_cmd)
+        if os.path.isdir(mkenv_dir) and not os.path.islink(mkenv_dir):
+            # In case the repo wasn't initialized...initializing it again actually doesn't hurt anything
+            run(['git', '-C', mkenv_dir, 'init'])
+            completion = run(['git', '-C', mkenv_dir, 'remote', 'set-url', 'origin', MKENV_REPO], verbose=verbose,
+                             check=False)
+            if completion.returncode != 0:
+                completion = run(['git', '-C', mkenv_dir, 'remote', 'add', 'origin', MKENV_REPO], verbose=verbose)
+            run(['git', '-C', mkenv_dir, 'fetch', 'origin'], verbose=verbose)
+            run(['git', '-C', mkenv_dir, 'checkout', MKENV_BRANCH], verbose=verbose)
+            run(['git', '-C', mkenv_dir, 'reset', '--hard', f'origin/{MKENV_BRANCH}'], verbose=verbose)
+        elif os.path.exists(mkenv_dir):
+            sys.exit('*** .mkenv is not a directory; remove it and try again.')
+        else:
+            run(['git', 'clone', MKENV_REPO, MKENV_SUBDIR, '--branch', MKENV_BRANCH], verbose=verbose)
+        sys.path.insert(0, mkenv_dir)
+        mkenv_impl = importlib.import_module(MKENV_IMPL)
+        return mkenv_impl
+    finally:
+        sys.path[:] = old_sys_path
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Virtual environment setup script')
-    parser.add_argument('-v', '--verbose', action='store_true',
-                        help='Show package installation output')
-    parser.add_argument('--env-name', action='store_true',
-                        help='Print the environment name and exit')
-    parser.add_argument('--env-path', action='store_true',
-                        help='Print the path to the programs in the environment and exit')
-    opts = parser.parse_args()
+    mkenv_impl = None
 
-    output_route = None if opts.verbose else subprocess.DEVNULL
+    if not DL_MKENV_ENVIRONMENT_OVERRIDE:
+        # Use local module only if exists and not overridden by environment
+        old_sys_path = sys.path.copy()
+        sys.path.insert(0, HERE)
+        try:
+            mkenv_impl = importlib.import_module(MKENV_IMPL)
+        except ModuleNotFoundError:
+            pass
+        finally:
+            sys.path[:] = old_sys_path
 
-    if opts.env_name:
-        print(HOME_DIR)
-        return
-
-    if opts.env_path:
-        scripts_or_bin = 'Scripts' if windows() else 'bin'
-        print(os.path.join(HERE, HOME_DIR, scripts_or_bin))
-        return
-
-    print('Creating virtualenv ', HOME_DIR)
-    # venv.main() does this, and it makes it possible to create a virtual environment
-    # more than once on Windows.
-    if os.name == 'nt':
-        use_symlinks = False
-    else:
-        use_symlinks = True
-    venv.create(HOME_DIR, system_site_packages=False, symlinks=use_symlinks, with_pip=True)
-
-    install_project_requirements(output_route)
-
-
-def windows():
-    'returns True on Windows platforms'
-    return platform.system() == 'Windows'
+    if mkenv_impl is None:
+        mkenv_impl = get_mkenv_impl_from_git()
+    return mkenv_impl.main(HERE)
 
 
 if __name__ == '__main__':

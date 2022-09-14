@@ -146,7 +146,7 @@ config:
     #     Dictionary keys override the base
     #     Lists are appended
 
-    macos:
+    macos-x86_64:
         # Per-platform profiles can be set here. Profiles can be a string or a
         # list of strings as seen below. By using a list, the build_tools
         # profile can be added, and adds the build tools for development builds.
@@ -154,8 +154,218 @@ config:
         # profile:
         #     - apple-clang-10.0-macos-10.9
         #     - build_tools
+        common: &macOSCommon
+            # Note: split build/host profiles aren't supported by recipes in Conan Center Index
+            # profile_build:
+            #     - apple-clang-12.0-macos-10.9-cppstd-14
+            build:
+                - missing
+        config:
+            Release: &macOSRelease
+                <<: *macOSCommon
+                build_folder: build-release
+                description: macOS Release
+                profile_host:
+                    - apple-clang-13.0-intel-cppstd-14
+            Debug: &macOSDebug
+                <<: *macOSRelease
+                build_folder: build
+                description: macOS Debug
+                settings:
+                    - build_type=Debug
+            ReleaseTool: &macOSReleaseTool
+                <<: *macOSCommon
+                build_folder: build-release
+                description: macOS Release
+                profile_host:
+                    - apple-clang-13.0-intel
+            DebugTool: &macOSDebugTool
+                include:
+                    - ReleaseTool
+                build_folder: build
+                description: macOS Debug
+                settings:
+                    - build_type=Debug
+        # If the entry is a string, it's taken to be the package name,
+        # else the entry can be a dictionary of package name and options
+        prebuilt_tools:
+            - cmake/[>=3.23.0]
+            - doxygen/1.9.1
+            - package: doxygen/1.9.1
+              options:
+                  - doxygen:enable_search=False
+            - ninja/[~1.10.0]
+            - ninja/[>=1.0.0]
+            - b2/4.8.0
+            - swig/1.3.40+dl.1
+        prebuilt_tools_configs:
+            - ReleaseTool
 
-    redhat:
+
+    macos-arm64:
+        # Per-platform profiles can be set here. Profiles can be a string or a
+        # list of strings as seen below. By using a list, the build_tools
+        # profile can be added, and adds the build tools for development builds.
+        #
+        # profile:
+        #     - apple-clang-10.0-macos-10.9
+        #     - build_tools
+        config:
+            Release:
+                <<: *macOSCommon
+                build_folder: build-release
+                description: macOS Release
+                profile_host:
+                    - apple-clang-13.0-arm-cppstd-14
+            Debug:
+                <<: *macOSRelease
+                build_folder: build
+                description: macOS Debug
+                settings:
+                    - build_type=Debug
+            ReleaseTool:
+                <<: *macOSCommon
+                build_folder: build-release
+                description: macOS Release
+                profile_host:
+                    - apple-clang-13.0-arm
+            DebugTool:
+                include:
+                    - ReleaseTool
+                build_folder: build
+                description: macOS Debug
+                settings:
+                    - build_type=Debug
+        # If the entry is a string, it's taken to be the package name,
+        # else the entry can be a dictionary of package name and options
+        prebuilt_tools:
+            - cmake/[>=3.23.0]
+            - doxygen/1.9.1
+            - package: doxygen/1.9.1
+              options:
+                  - doxygen:enable_search=False
+            - ninja/[~1.10.0]
+            - ninja/[>=1.0.0]
+            - b2/4.8.0
+            - swig/1.3.40+dl.1
+        prebuilt_tools_configs:
+            - ReleaseTool
+
+
+    redhat-6-x86_64:
+        common: &redhatCommon
+            build:
+                - missing
+        config: &redhat6Config
+            Release: &redhatRelease
+                <<: *redhatCommon
+                build_folder: build-release
+                description: RedHat Release
+                profile_host:
+                    - llvm-toolset-7-cppstd-14
+            Debug: &redhatDebug
+                <<: *redhatRelease
+                build_folder: build-debug
+                description: RedHat Debug
+                settings:
+                    - build_type=Debug
+            Release32: &redhatRelease32
+                <<: *redhatCommon
+                build_folder: build-release-32
+                description: RedHat Release 32
+                profile_host:
+                    - llvm-toolset-7-cppstd-14
+                settings:
+                    - arch=x86
+            Debug32: &redhatDebug32
+                <<: *redhatRelease32
+                build_folder: build-debug-32
+                description: RedHat Debug 32
+                settings:
+                    - build_type=Debug
+            ReleaseTool: &redhatReleaseTool
+                <<: *redhatCommon
+                build_folder: build-release-tool
+                description: RedHat Release Tool
+                profile_host:
+                    - devtoolset-7
+            DebugTool: &redhatDebugTool
+                include: ReleaseTool
+                build_folder: build-debug-tool
+                description: RedHat Debug Tool
+                settings:
+                    - build_type=Debug
+            ReleaseTool32: &redhatReleaseTool32
+                include: ReleaseTool
+                build_folder: build-release-tool-32
+                description: RedHat Release Tool 32
+                settings:
+                    - arch=x86
+            DebugTool32: &redhatDebugTool32
+                include: ReleaseTool32
+                build_folder: build-debug-tool-32
+                description: RedHat Debug Tool 32
+                settings:
+                    - build_type=Debug
+        prebuilt_tools: &redhat6Tools
+            - package: cmake/[>=3.23.0]
+            - package: doxygen/1.9.1
+            - package: doxygen/1.9.1
+              options:
+                  - doxygen:enable_search=False
+            - package: ninja/[~1.10.0]
+            - b2/4.8.0
+            - swig/1.3.40+dl.1
+        prebuilt_tools_configs:
+            # Build 64-bit tools on RHEL 6, because they're used for 64-bit DLE for APDFL 15
+            - ReleaseTool
+
+    redhat-7-x86_64:
+        config: *redhat6Config
+        prebuilt_tools:
+            - ninja/[>=1.0.0]
+        prebuilt_tools_configs:
+            - ReleaseTool
+
+    redhat-aarch64:
+        common: &redhatARMCommon
+            build:
+                - missing
+        config:
+            Release: &redhatARMRelease
+                <<: *redhatARMCommon
+                build_folder: build-release
+                description: RedHat Release
+                profile_host:
+                    - llvm-toolset-7.0-armv8
+            Debug: &redhatARMDebug
+                <<: *redhatARMRelease
+                build_folder: build-debug
+                description: RedHat Debug
+                settings:
+                    - build_type=Debug
+            ReleaseTool:
+                build_folder: build-release-tool
+                description: RedHat Release
+                include:
+                    - Release
+            DebugTool:
+                build_folder: build-debug-tool
+                description: RedHat Debug
+                include:
+                    - Debug
+        prebuilt_tools:
+            - cmake/[>=3.23.0]
+            - doxygen/1.9.1
+            - package: doxygen/1.9.1
+              options:
+                  - doxygen:enable_search=False
+            - ninja/[~1.10.0]
+            - ninja/[>=1.0.0]
+            - b2/4.8.0
+            - swig/1.3.40+dl.1
+        prebuilt_tools_configs:
+            - ReleaseTool
 
     windows:
         # Can set the generator differently on a per-machine basis (but automatic is
@@ -166,6 +376,225 @@ config:
         # Can override packager build_tools on a per-platform basis:
         # packager:
         #     build_tools: build_tools_windows
+        config:
+            Release:
+                build_folder: build-release
+                description: Windows Release
+                profile_host: visual-studio-16
+                settings:
+                    compiler.toolset=v141
+                build:
+                    - missing
+            Debug: &windowsDebug
+                include: Release
+                build_folder: build-debug
+                description: Windows Debug
+                settings:
+                    - build_type=Debug
+            Release32:
+                include: Release
+                build_folder: build-release-32
+                description: Windows Release 32
+                settings:
+                    - arch=x86
+            Debug32:
+                include: Release32
+                build_folder: build-debug-32
+                description: Windows Debug 32
+                settings:
+                    - build_type=Debug
+            ReleaseTool:
+                build_folder: build-release-tool
+                description: Windows Release
+                profile_host: visual-studio-16
+            DebugTool:
+                build_folder: build-debug-tool
+                description: Windows Debug Tool
+                include:
+                    - ReleaseTool
+                settings:
+                    - build-type=Debug
+            ReleaseTool32:
+                build_folder: build-release-32-tool
+                description: Windows Release 32 Tool
+                include:
+                    - ReleaseTool
+                settings:
+                    - arch=x86
+            DebugTool32:
+                build_folder: build-debug-32-tool
+                description: Windows Debug 32 Tool
+                include:
+                    - ReleaseTool32
+                settings:
+                    - build-type=Debug
+            default: *windowsDebug
+        prebuilt_tools:
+            - cmake/[>=3.23.0]
+            - package: doxygen/1.9.1
+              configs:
+                # xapian-core doesn't work for cross-building x86_64 to x86
+                - ReleaseTool
+            - package: doxygen/1.9.1
+              options:
+                  - doxygen:enable_search=False
+            - ninja/[~1.10.0]
+            - ninja/[>=1.0.0]
+            - b2/4.8.0
+            - swig/1.3.40+dl.1
+            - innoextract/1.9.0
+        prebuilt_tools_configs:
+            - ReleaseTool
+
+    aix:
+        common: &aixCommon
+            build:
+                - missing
+        config:
+            Release: &aixRelease
+                <<: *aixCommon
+                build_folder: build-release
+                description: AIX Release
+                profile_host: gcc-8-aix71-64
+            Debug: &aixDebug
+                <<: *aixRelease
+                build_folder: build-debug
+                description: AIX Debug
+                settings:
+                    - build_type=Debug
+            Release32: &aixRelease32
+                <<: *aixRelease
+                build_folder: build-release-32
+                description: AIX Release 32
+                profile_host: gcc-8-aix71-32
+            Debug32: &aixDebug32
+                <<: *aixRelease32
+                build_folder: build-debug-32
+                description: AIX Debug 32
+                settings:
+                    - build_type=Debug
+            ReleaseTool:
+                <<: *aixCommon
+                build_folder: build-release-tool
+                description: AIX Release
+                profile_host: aix-xlc16-ppc
+            ReleaseToolGCC:
+                build_folder: build-release-tool
+                description: AIX Release Tool with GCC
+                include:
+                    - Release
+            DebugTool:
+                build_folder: build-debug-tool
+                description: AIX Debug Tool
+                include:
+                    - Debug
+            ReleaseTool32:
+                build_folder: build-release-tool-32
+                description: AIX Release 32 Tool 32
+                include:
+                    - Release32
+            DebugTool32:
+                build_folder: build-debug-tool-32
+                description: AIX Debug 32 Tool
+                include:
+                    - Debug32
+        prebuilt_tools:
+            - package: cmake/[>=3.23.0]
+              options:
+                - cmake:with_openssl=False
+              configs:
+                - ReleaseTool
+            - package: doxygen/1.9.1
+              options:
+                  - doxygen:enable_search=False
+            - package: ninja/[~1.10.0]
+              configs:
+                - ReleaseTool
+            - package: ninja/[>=1.0.0]
+              configs:
+                - ReleaseTool
+            - package: b2/4.8.0
+              configs:
+                - ReleaseToolGCC
+            - package: swig/1.3.40+dl.1
+              configs:
+                - ReleaseTool
+        prebuilt_tools_configs:
+            - ReleaseTool
+            - ReleaseToolGCC
+
+    sunos:
+        common: &sparcCommon
+            build:
+                - missing
+        config:
+            Release: &sparcRelease
+                <<: *sparcCommon
+                build_folder: build-release
+                description: Sparc Release
+                profile_host: gcc-9-sparc-solaris
+                env_host:
+                    - PATH=[/opt/cmake-3.19/bin]
+            Debug: &sparcDebug
+                <<: *sparcRelease
+                build_folder: build-debug
+                description: Sparc Debug
+                settings:
+                    - build_type=Debug
+            Release32: &sparcRelease32
+                <<: *sparcRelease
+                build_folder: build-release-32
+                description: Sparc Release 32
+                profile_host: gcc-9-sparc32-solaris
+            Debug32: &sparcDebug32
+                <<: *sparcRelease32
+                build_folder: build-debug-32
+                description: Sparc Debug 32
+                settings:
+                    - build_type=Debug
+            ReleaseTool:
+                build_folder: build-release-tool
+                description: Sparc Release Tool
+                include:
+                    - Release
+                env:
+                    # Override to not contain -std=c99, which breaks m4 by turning off the 'asm' keyword
+                    - CFLAGS=-pthread -m64
+            DebugTool:
+                build_folder: build-debug-tool
+                description: Sparc Debug Tool
+                include:
+                    - ReleaseTool
+                settings:
+                    - build_type=Debug
+            ReleaseTool32:
+                build_folder: build-release-tool-32
+                description: Sparc Release 32 Tool 32
+                include:
+                    - Release32
+                env:
+                    # Override to not contain -std=c99, which breaks m4 by turning off the 'asm' keyword
+                    - CFLAGS="-pthread -m32"
+            DebugTool32:
+                build_folder: build-debug-tool-32
+                description: Sparc Debug 32 Tool
+                include:
+                    - DebugTool32
+                settings:
+                    - build_type=Debug
+        prebuilt_tools:
+            - package: cmake/[>=3.23.0]
+              options:
+                - cmake:with_openssl=False
+            - package: doxygen/1.9.1
+              options:
+                  - doxygen:enable_search=False
+            - ninja/[~1.10.0]
+            - ninja/[>=1.0.0]
+            - b2/4.8.0
+            - swig/1.3.40+dl.1
+        prebuilt_tools_configs:
+            - ReleaseTool
 
     byhost:
         # Configs based on hostname.
