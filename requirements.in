@@ -8,3 +8,4 @@ pipdeptree
 certifi
 pytest
 pytest-html
+pre-commit; sys_platform != 'aix' and sys_platform != 'sunos5'
