@@ -350,16 +350,22 @@ config:
                 description: RedHat Debug
                 settings:
                     - build_type=Debug
+            ToolCommon:
+                env:
+                    # This is necessary to get SWIG to link on ARM; for some reason, it's not automatic
+                    - swig:LDFLAGS=-ldl
             ReleaseTool:
                 build_folder: build-release-tool
                 description: RedHat Release
                 include:
                     - Release
+                    - ToolCommon
             DebugTool:
                 build_folder: build-debug-tool
                 description: RedHat Debug
                 include:
                     - Debug
+                    - ToolCommon
         prebuilt_tools:
             - cmake/[>=3.23.0]
             - doxygen/1.9.1
