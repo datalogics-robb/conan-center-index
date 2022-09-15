@@ -1,3 +1,4 @@
+import importlib
 import io
 import os
 from concurrent import futures
@@ -130,6 +131,14 @@ conan_tasks = Collection()
 conan_tasks.add_task(conan.install_config)
 conan_tasks.add_task(conan.login)
 conan_tasks.add_task(conan.purge)
+
+# Load the Jenkins tasks form dl_pre_commit_hooks, if it is available
+# (which it is not on AIX or Solaris)
+try:
+    jenkins_tasks = importlib.import_module('dl_pre_commit_hooks.tasks.jenkins')
+    tasks.append(jenkins_tasks)
+except ModuleNotFoundError:
+    pass
 
 ns = Collection(*tasks)
 ns.add_collection(conan_tasks, 'conan')

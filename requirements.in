@@ -9,3 +9,4 @@ certifi
 pytest
 pytest-html
 pre-commit; sys_platform != 'aix' and sys_platform != 'sunos5'
+dl-pre-commit-hooks; sys_platform != 'aix' and sys_platform != 'sunos5'

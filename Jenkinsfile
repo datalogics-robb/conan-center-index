@@ -144,6 +144,28 @@ pipeline {
                 }
             }
         }
+        stage('Pre-commit checks') {
+            when {
+                changeRequest()
+            }
+            steps {
+                catchError(message: 'pre-commit had errors', stageResult: 'FAILURE') {
+                    script {
+                        if (isUnix()) {
+                            sh  """
+                                        . ${ENV_LOC['noarch']}/bin/activate
+                                        invoke jenkins.pre-commit
+                                        """
+                        } else {
+                            bat """
+                                        CALL ${ENV_LOC['noarch']}\\Scripts\\activate
+                                        invoke jenkins.pre-commit
+                                        """
+                        }
+                    }
+                }
+            }
+        }
         stage('Upload new or changed recipes') {
             when {
                 not {
