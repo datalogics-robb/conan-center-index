@@ -1,7 +1,8 @@
 import io
 import os
-import yaml
 from concurrent import futures
+
+import yaml
 from dl_conan_build_tools.tasks import conan
 from invoke import Collection, Exit
 from invoke.tasks import Task, task

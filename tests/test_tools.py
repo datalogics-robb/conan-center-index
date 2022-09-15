@@ -1,13 +1,13 @@
 import json
 import os
 import platform
-import semver
 import shutil
 import subprocess
-from typing import NamedTuple, List
+from typing import List, NamedTuple
 
 import dl_conan_build_tools.config
 import pytest
+import semver
 from dl_conan_build_tools.tasks.conan import Config
 
 from util import recipes
