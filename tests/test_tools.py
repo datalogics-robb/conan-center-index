@@ -1,13 +1,13 @@
 import json
 import os
 import platform
-import semver
 import shutil
 import subprocess
-from typing import NamedTuple, List
+from typing import List, NamedTuple
 
 import dl_conan_build_tools.config
 import pytest
+import semver
 from dl_conan_build_tools.tasks.conan import Config
 
 from util import recipes
@@ -152,6 +152,15 @@ def conan_env(msys_bin):
 
 
 class TestBuildTools(object):
+    def search_local_package(self, ref, conan_env, tmp_path):
+        search_json = tmp_path / 'search.json'
+        args = ['conan', 'search', f'{ref}@', '-j', str(search_json)]
+        print(f'Getting package information for {ref}: {" ".join(args)}')
+        subprocess.run(args, check=True, stderr=subprocess.STDOUT, env=conan_env)
+        with open(search_json) as json_file:
+            search_data = json.load(json_file)
+        return search_data
+
     def test_build_tool(self, prebuilt_tool, prebuilt_tool_config_name, prebuilt_tool_config, tool_recipe_folder,
                         upload_to, force_build, tmp_path, conan_env):
         if prebuilt_tool.configs and prebuilt_tool_config_name not in prebuilt_tool.configs:
@@ -198,6 +207,13 @@ class TestBuildTools(object):
                 package = ref.split('/')[0]
                 if package == 'msys2':
                     print(f'Not uploading {ref}, because it tends to modify itself during use.')
+                    continue
+                search_data = self.search_local_package(ref, conan_env, tmp_path)
+                settings = search_data['results'][0]['items'][0]['packages'][0]['settings']
+                if platform.system() == 'Windows' and 'os' not in settings:
+                    # Don't upload OS-universal packages from Windows; this avoids packaging
+                    # script-based packages like autoconf without the proper mode bits
+                    print(f'Not uploading {ref} on Windows, because it is not os-specific.')
                     continue
                 args = ['conan', 'upload', '-r', upload_to, f'{ref}@', '--all', '--check']
                 print(f'Uploading {ref}: {" ".join(args)}')

@@ -144,6 +144,28 @@ pipeline {
                 }
             }
         }
+        stage('Pre-commit checks') {
+            when {
+                changeRequest()
+            }
+            steps {
+                catchError(message: 'pre-commit had errors', stageResult: 'FAILURE') {
+                    script {
+                        if (isUnix()) {
+                            sh  """
+                                        . ${ENV_LOC['noarch']}/bin/activate
+                                        invoke jenkins.pre-commit
+                                        """
+                        } else {
+                            bat """
+                                        CALL ${ENV_LOC['noarch']}\\Scripts\\activate
+                                        invoke jenkins.pre-commit
+                                        """
+                        }
+                    }
+                }
+            }
+        }
         stage('Upload new or changed recipes') {
             when {
                 not {
@@ -287,20 +309,17 @@ pipeline {
                     }
                     stage('build tools') {
                         when {
-                            allOf {
-                                not {
-                                    changeRequest()
-                                }
-                                expression { BUILD_TOOLS[NODE] }
-                            }
+                            expression { BUILD_TOOLS[NODE] }
                         }
                         steps {
                             script {
-                                def remote
-                                if (env.BRANCH_NAME =~ 'master*') {
-                                    remote = 'conan-center-dl'
-                                } else {
-                                    remote = 'conan-center-dl-staging'
+                                def upload = ""
+                                if (env.CHANGE_ID == null) {  // i.e. not a pull request
+                                    if (env.BRANCH_NAME =~ 'master*') {
+                                        upload = '--upload-to conan-center-dl'
+                                    } else {
+                                        upload = '--upload-to conan-center-dl-staging'
+                                    }
                                 }
                                 def short_node = NODE.replace('-conan-center-index', '')
                                 def force_build
@@ -311,7 +330,7 @@ pipeline {
                                 } else {
                                     force_build = ''
                                 }
-                                def pytest_command = "pytest -k build_tool ${force_build} --upload-to ${remote} --junitxml=build-tools.xml --html=${short_node}-build-tools.html"
+                                def pytest_command = "pytest -k build_tool ${force_build} ${upload} --junitxml=build-tools.xml --html=${short_node}-build-tools.html"
                                 if (isUnix()) {
                                     catchError(message: 'pytest had errors', stageResult: 'FAILURE') {
                                         script {

@@ -7,7 +7,7 @@ import sys
 
 if sys.version_info[:2] < (3, 9):
     # Don't allow anything but Python 3.9 or higher
-    raise SystemError("Only Python 3.9+ is allowed")
+    raise SystemError('Only Python 3.9+ is allowed')
 
 MKENV_IMPL = 'mkenv_impl'
 HERE = os.path.dirname(os.path.abspath(__file__))
