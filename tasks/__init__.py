@@ -8,6 +8,8 @@ from dl_conan_build_tools.tasks import conan
 from invoke import Collection, Exit
 from invoke.tasks import Task, task
 
+from . import merging
+
 
 @task(help={'remote': 'remote to upload to, default conan-center-dl-staging',
             'package': 'name of package to upload, can be specified more than once',
@@ -126,6 +128,7 @@ def upload_one_package_name(ctx, package_name, remote, upload=True):
 
 tasks = []
 tasks.extend([v for v in locals().values() if isinstance(v, Task)])
+tasks.append(merging.merge_upstream)
 
 conan_tasks = Collection()
 conan_tasks.add_task(conan.install_config)
