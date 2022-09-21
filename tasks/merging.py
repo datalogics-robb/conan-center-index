@@ -1,6 +1,7 @@
 import contextlib
 import dataclasses
 import getpass
+import json
 import platform
 import shlex
 import shutil
@@ -193,20 +194,36 @@ def _create_pull_request(ctx, config, pr_body):
     else:
         ctx.run(f'git checkout -b {config.merge_branch_name} FETCH_HEAD')
 
-    # TODO: handle PR already exists
-
     ctx.run(f'git push --force {config.fork_url} {config.merge_branch_name}')
     with tempfile.NamedTemporaryFile(prefix='pr-body', mode='w+', encoding='utf-8') as pr_body_file:
         pr_body_file.write(pr_body)
         # Before passing the filename to gh pr create, flush it so all the data is on the disk
         pr_body_file.flush()
 
-        title = shlex.quote('Merge in changes from conan-io/master')
-        labels = f' --label {",".join(config.pr_labels)}' if config.pr_labels else ''
-        assignee = f' --assignee {config.pr_assignee}' if config.pr_assignee else ''
-        reviewer = f' --reviewer {",".join(config.pr_reviewers)}' if config.pr_reviewers else ''
-        ctx.run(f'gh pr create --repo {config.local_host}/{config.local_organization}/conan-center-index '
-                f'--base {config.local_branch} '
-                f'--title {title} --body-file {pr_body_file.name} '
-                f'--head {config.local_fork}:{config.merge_branch_name}'
-                f'{labels}{assignee}{reviewer}')
+        existing_prs = _list_merge_pull_requests(ctx, config)
+        if existing_prs:
+            assert len(existing_prs) == 1
+            url = existing_prs[0]['url']
+            ctx.run(f'gh pr edit --repo {config.local_host}/{config.local_organization}/conan-center-index '
+                    f'{url} --body-file {pr_body_file.name}')
+        else:
+            title = shlex.quote('Merge in changes from conan-io/master')
+            labels = f' --label {",".join(config.pr_labels)}' if config.pr_labels else ''
+            assignee = f' --assignee {config.pr_assignee}' if config.pr_assignee else ''
+            reviewer = f' --reviewer {",".join(config.pr_reviewers)}' if config.pr_reviewers else ''
+            ctx.run(f'gh pr create --repo {config.local_host}/{config.local_organization}/conan-center-index '
+                    f'--base {config.local_branch} '
+                    f'--title {title} --body-file {pr_body_file.name} '
+                    f'--head {config.local_fork}:{config.merge_branch_name}'
+                    f'{labels}{assignee}{reviewer}')
+
+
+def _list_merge_pull_requests(ctx, config):
+    result = ctx.run(f'gh pr list --repo {config.local_host}/{config.local_organization}/conan-center-index '
+                     '--json number,url,author,headRefName,headRepositoryOwner ',
+                     hide='stdout',
+                     pty=False)
+    out = result.stdout.strip()
+    requests = json.loads(out) if out else []
+    return [r for r in requests if
+            r['headRefName'] == config.merge_branch_name and r['headRepositoryOwner']['login'] == config.local_fork]
