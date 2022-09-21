@@ -1,6 +1,10 @@
 import dataclasses
+import getpass
 import platform
+import shlex
 import shutil
+import tempfile
+import textwrap
 from typing import Optional
 
 import yaml
@@ -20,12 +24,19 @@ class MergeUpstreamConfig:
     local_organization: str = 'kam'  # TODO: datalogics
     local_branch: str = 'develop'
     local_remote_name: str = 'merge-local-remote'
+    local_fork: str = getpass.getuser()
+    merge_branch_name: str = 'merge-from-conan-io'
     pr_reviewers: list[str] = dataclasses.field(default_factory=list)
     pr_assignee: Optional[str] = None
+    pr_labels: list[str] = dataclasses.field(default_factory=lambda: ['from-conan-io'])
 
     @property
     def local_url(self) -> str:
         return f'git@{self.local_host}:{self.local_organization}/conan-center-index.git'
+
+    @property
+    def fork_url(self) -> str:
+        return f'git@{self.local_host}:{self.local_fork}/conan-center-index.git'
 
     @classmethod
     def create_from_dlproject(cls):
@@ -54,8 +65,11 @@ def merge_upstream(ctx):
     try:
         _merge_and_push(ctx, config)
     except MergeHadConflicts:
-        ctx.run('git merge --abort')
-        raise Exit('There were merge conflicts!')
+        try:
+            pr_body = _form_pr_body(ctx, config)
+        finally:
+            ctx.run('git merge --abort')
+        _create_pull_request(ctx, config, pr_body)
 
 
 def _check_preconditions(ctx, config):
@@ -85,10 +99,15 @@ def _update_remote(ctx, config):
     ctx.run(f'git remote update {config.local_remote_name}')
 
 
+def _branch_exists(ctx, branch):
+    """Return true if the given branch exists locally"""
+    result = ctx.run(f'git rev-parse --quiet --verify {branch}', warn=True, hide='stdout')
+    return result.ok
+
+
 def _update_branch(ctx, config):
     """Check out and update branch"""
-    result = ctx.run(f'git rev-parse --quiet --verify {config.local_branch}', warn=True, hide='stdout')
-    if result.ok:
+    if _branch_exists(ctx, config.local_branch):
         ctx.run(f'git checkout {config.local_branch}')
         ctx.run(f'git reset --hard {config.local_remote_name}/{config.local_branch}')
     else:
@@ -107,3 +126,67 @@ def _merge_and_push(ctx, config):
             raise MergeHadConflicts
         # Something else went wrong with the merge
         raise UnexpectedExit(merge_result)
+
+
+def _form_pr_body(ctx, config):
+    """Create a body for the pull request summarizing information about the merge conflicts."""
+    # Note: pty=False to enforce not using a PTY; that makes sure that Git doesn't
+    # see a terminal and put escapes into the output we want to format.
+    conflict_files_result = ctx.run('git diff --no-color --name-only --diff-filter=U', hide='stdout', pty=False)
+    commits_on_upstream_result = ctx.run(
+        'git log --no-color --merge HEAD..MERGE_HEAD --pretty=format:"%h -%d %s (%cr) <%an>"', hide='stdout', pty=False)
+    commits_local_result = ctx.run(
+        'git log --no-color --merge MERGE_HEAD..HEAD --pretty=format:"%h -%d %s (%cr) <%an>"', hide='stdout', pty=False)
+    body = textwrap.dedent('''
+        Merge changes from conan-io/conan-center-index into {local_branch}.
+
+        This PR was automatically created due to merge conflicts in the automated merge.
+
+        ## Conflict information
+
+        ### List of conflict files
+
+        {conflict_files}
+
+        ### Commits for conflict files on `conan-io`
+
+        {commits_on_upstream}
+
+        ### Commits for conflict files, local
+
+        {commits_local}
+    ''').format(local_branch=config.local_branch,
+                conflict_files=conflict_files_result.stdout,
+                commits_on_upstream=commits_on_upstream_result.stdout,
+                commits_local=commits_local_result.stdout)
+
+    return body
+
+
+def _create_pull_request(ctx, config, pr_body):
+    """Create a pull request to merge in the data from upstream."""
+    # Get on a merge branch
+    ctx.run(f'git fetch {config.cci_url} {config.cci_branch}')
+    if _branch_exists(ctx, config.merge_branch_name):
+        ctx.run(f'git checkout {config.merge_branch_name}')
+        ctx.run('git reset --hard FETCH_HEAD')
+    else:
+        ctx.run(f'git checkout -b {config.merge_branch_name} FETCH_HEAD')
+
+    # TODO: handle PR already exists
+
+    ctx.run(f'git push --force {config.fork_url} {config.merge_branch_name}')
+    with tempfile.NamedTemporaryFile(prefix='pr-body', mode='w+', encoding='utf-8') as pr_body_file:
+        pr_body_file.write(pr_body)
+        # Before passing the filename to gh pr create, flush it so all the data is on the disk
+        pr_body_file.flush()
+
+        title = shlex.quote('Merge in changes from conan-io/master')
+        labels = f' --label {",".join(config.pr_labels)}' if config.pr_labels else ''
+        assignee = f' --assignee {config.pr_assignee}' if config.pr_assignee else ''
+        reviewer = f' --reviewer {",".join(config.pr_reviewers)}' if config.pr_reviewers else ''
+        ctx.run(f'gh pr create --repo {config.local_host}/{config.local_organization}/conan-center-index '
+                f'--base {config.local_branch} '
+                f'--title {title} --body-file {pr_body_file.name} '
+                f'--head {config.local_fork}:{config.merge_branch_name}'
+                f'{labels}{assignee}{reviewer}')
