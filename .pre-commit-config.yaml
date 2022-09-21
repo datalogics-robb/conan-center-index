@@ -20,6 +20,8 @@ repos:
             -   id: check-yaml
             -   id: check-added-large-files
             -   id: double-quote-string-fixer
+            -   id: check-docstring-first
+            -   id: debug-statements
     -   repo: https://gitlab.com/pycqa/flake8
         rev: 3.9.2
         hooks:
