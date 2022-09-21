@@ -1,3 +1,4 @@
+import contextlib
 import dataclasses
 import getpass
 import platform
@@ -58,18 +59,37 @@ def merge_upstream(ctx):
     _check_preconditions(ctx, config)
     print(f'Configuration: {config}')
 
-    _update_remote(ctx, config)
-    _update_branch(ctx, config)
+    with _preserving_branch_and_commit(ctx):
+        _update_remote(ctx, config)
+        _update_branch(ctx, config)
 
-    # Try to merge from CCI
-    try:
-        _merge_and_push(ctx, config)
-    except MergeHadConflicts:
+        # Try to merge from CCI
         try:
-            pr_body = _form_pr_body(ctx, config)
-        finally:
-            ctx.run('git merge --abort')
-        _create_pull_request(ctx, config, pr_body)
+            _merge_and_push(ctx, config)
+        except MergeHadConflicts:
+            try:
+                pr_body = _form_pr_body(ctx, config)
+            finally:
+                ctx.run('git merge --abort')
+            _create_pull_request(ctx, config, pr_body)
+
+
+@contextlib.contextmanager
+def _preserving_branch_and_commit(ctx):
+    """Context manager to run complicated sets of Git commands, while returning
+    to the original branch and placing that branch back onto the original commit."""
+    result = ctx.run('git rev-parse --abbrev-ref HEAD', hide='stdout')
+    branch = result.stdout.strip()
+    result = ctx.run('git rev-parse HEAD', hide='stdout')
+    commit = result.stdout.strip()
+    try:
+        yield
+    finally:
+        if branch == 'HEAD':
+            ctx.run(f'git checkout --detach {commit}')
+        else:
+            ctx.run(f'git checkout --force {branch}')
+            ctx.run(f'git reset --hard {commit}')
 
 
 def _check_preconditions(ctx, config):
