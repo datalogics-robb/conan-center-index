@@ -2,19 +2,35 @@ import contextlib
 import dataclasses
 import getpass
 import json
+import os
 import platform
 import shlex
 import shutil
 import tempfile
 import textwrap
+from enum import Enum, auto
 from typing import Optional
 
 import yaml
 from invoke import Exit, Task, UnexpectedExit
 
+# Name of a status file
+MERGE_UPSTREAM_STATUS = '.merge-upstream-status'
+
 
 class MergeHadConflicts(Exception):
     pass
+
+
+class MergeStatus(Enum):
+    """The status of the attempted merge. The name of this status will be placed into the
+    file .merge-upstream-status."""
+    UP_TO_DATE = auto()
+    """The branch was already up to date."""
+    MERGED = auto()
+    """The branch was merged (and pushed)."""
+    PULL_REQUEST = auto()
+    """A pull request was necessary."""
 
 
 @dataclasses.dataclass
@@ -61,18 +77,34 @@ def merge_upstream(ctx):
     print(f'Configuration: {config}')
 
     with _preserving_branch_and_commit(ctx):
+        _remove_status_file()
+
         _update_remote(ctx, config)
         _update_branch(ctx, config)
 
         # Try to merge from CCI
         try:
-            _merge_and_push(ctx, config)
+            _write_status_file(_merge_and_push(ctx, config))
         except MergeHadConflicts:
             try:
                 pr_body = _form_pr_body(ctx, config)
             finally:
                 ctx.run('git merge --abort')
             _create_pull_request(ctx, config, pr_body)
+            _write_status_file(MergeStatus.PULL_REQUEST)
+
+
+def _remove_status_file():
+    try:
+        os.remove(MERGE_UPSTREAM_STATUS)
+    except FileNotFoundError:
+        pass
+
+
+def _write_status_file(merge_status):
+    """Write the merge status to the status file."""
+    with open(MERGE_UPSTREAM_STATUS, 'w') as merge_upstream_status:
+        merge_upstream_status.write(merge_status.name)
 
 
 @contextlib.contextmanager
@@ -139,7 +171,17 @@ def _merge_and_push(ctx, config):
     """Attempt to merge upstream branch and push it to the local repo."""
     merge_result = ctx.run(f'git pull --no-ff --no-edit {config.cci_url} {config.cci_branch}', warn=True)
     if merge_result.ok:
-        ctx.run(f'git push {config.local_remote_name} {config.local_branch}')
+        # Check to see if a push is necessary by counting the number of revisions
+        # that differ between current head and the push destination.
+        count_revs_result = ctx.run(
+            f'git rev-list {config.local_remote_name}/{config.local_branch}..HEAD --count',
+            hide='stdout', pty=False)
+        needs_push = int(count_revs_result.stdout) != 0
+        if needs_push:
+            ctx.run(f'git push {config.local_remote_name} {config.local_branch}')
+            return MergeStatus.MERGED
+        else:
+            return MergeStatus.UP_TO_DATE
     else:
         # Check for merge conflicts: https://stackoverflow.com/a/27991004/11996393
         result = ctx.run('git ls-files -u', hide='stdout', warn=True, pty=False)
