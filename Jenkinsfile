@@ -11,6 +11,7 @@ def BUILD_TOOLS=[
     'sparcsolaris-conan-center-index': true,
     'windows-conan-center-index': true,
 ]
+def skipBuilding = false
 pipeline {
     parameters {
         choice(name: 'PLATFORM_FILTER',
@@ -166,10 +167,29 @@ pipeline {
                 }
             }
         }
+        stage('Merge from upstream') {
+            when {
+                expression { env.BRANCH_NAME =~ 'develop*' }
+            }
+            steps {
+                script {
+                    sh  """
+                    . ${ENV_LOC['noarch']}/bin/activate
+                    invoke merge-upstream
+                    """
+                    def merge_upstream_status = readFile(file: '.merge-upstream-status')
+                    echo "merge-upstream status is ${merge_upstream_status}"
+                    // If the status of the upstream merge is MERGED, then don't do anything
+                    // else; Jenkins will notice the branch changed and re-run.
+                    skipBuilding = merge_upstream_status == 'MERGED'
+                }
+            }
+        }
         stage('Upload new or changed recipes') {
             when {
-                not {
-                    changeRequest()
+                allOf {
+                    expression { !skipBuilding }
+                    not { changeRequest() }
                 }
             }
             steps {
@@ -206,8 +226,8 @@ pipeline {
                     }
                 }
                 when { anyOf {
-                    expression { params.PLATFORM_FILTER == 'all' }
-                    expression { params.PLATFORM_FILTER == env.NODE }
+                    expression { params.PLATFORM_FILTER == 'all' && !skipBuilding }
+                    expression { params.PLATFORM_FILTER == env.NODE && !skipBuilding }
                 } }
                 axes {
                     axis {
