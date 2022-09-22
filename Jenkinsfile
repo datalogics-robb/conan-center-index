@@ -31,6 +31,8 @@ pipeline {
             description: 'Force build of all tools. By default, Conan will download the tool and test it if it\'s already built'
         booleanParam name: 'FORCE_TOOL_BUILD_WITH_REQUIREMENTS', defaultValue: false,
             description: 'Force build of all tools, and their requirements. By default, Conan will download the tool and test it if it\'s already built'
+        booleanParam name: 'MERGE_UPSTREAM', defaultValue: false,
+            description: 'If building develop branch, merge changes from upstream, i.e., conan-io/conan-center-index'
     }
     options{
         buildDiscarder logRotator(artifactDaysToKeepStr: '4', artifactNumToKeepStr: '10', daysToKeepStr: '7', numToKeepStr: '10')
@@ -41,6 +43,11 @@ pipeline {
             label 'noarch-conan-center-index'
             customWorkspace "workspace/${JOB_NAME.replaceAll('/','_')}_noarch/"
         }
+    }
+    triggers {
+        // From the doc: @midnight actually means some time between 12:00 AM and 2:59 AM.
+        // This gives us automatic spreading out of jobs, so they don't cause load spikes.
+        cron('@midnight')
     }
     environment {
         CONAN_USER_HOME = "${WORKSPACE}"
@@ -176,7 +183,10 @@ pipeline {
         }
         stage('Merge from upstream') {
             when {
-                expression { env.BRANCH_NAME =~ 'develop*' }
+                expression {
+                    // Merge upstream on develop-prefixed branches if triggered by timer, or forced by parameter
+                    env.BRANCH_NAME =~ 'develop*' && (currentBuild.getBuildCauses('hudson.triggers.TimerTrigger$TimerTriggerCause') || params.MERGE_UPSTREAM)
+                }
             }
             steps {
                 script {
