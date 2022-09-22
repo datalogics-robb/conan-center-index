@@ -55,6 +55,13 @@ pipeline {
         LIBPATH = "randomval"
         DL_CONAN_CENTER_INDEX = 'all'
         TOX_TESTENV_PASSENV = 'CONAN_USER_HOME CONAN_NON_INTERACTIVE CONAN_PRINT_RUN_COMMANDS CONAN_LOGIN_USERNAME CONAN_PASSWORD TRACKFILEACCESS MSBUILDDISABLENODEREUSE'
+        // Create a personal access token on the devauto account on Octocat with repo and read:org access, and use it to
+        // create a secret text credential with the name github-cli-devauto-octocat-access-token
+        // See: https://cli.github.com/manual/gh_auth_login
+        GH_ENTERPRISE_TOKEN = credentials('github-cli-devauto-octocat-access-token')
+        // When using the token above 'gh help environment' says to also set GH_HOST
+        // https://cli.github.com/manual/gh_help_environment
+        GH_HOST = 'octocat.dlogics.com'
     }
     stages {
         stage('Clean/reset Git checkout for release') {
