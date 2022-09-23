@@ -2,6 +2,7 @@ import contextlib
 import dataclasses
 import getpass
 import json
+import logging
 import os
 import platform
 import shlex
@@ -16,6 +17,9 @@ from invoke import Exit, Task, UnexpectedExit
 
 # Name of a status file
 MERGE_UPSTREAM_STATUS = '.merge-upstream-status'
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 
 class MergeHadConflicts(Exception):
@@ -74,7 +78,7 @@ def merge_upstream(ctx):
     '''
     config = MergeUpstreamConfig.create_from_dlproject()
     _check_preconditions(ctx, config)
-    print(f'Configuration: {config}')
+    logger.info(f'merge-upstream configuration: {config}')
 
     # if anything fails past this point, the missing status file will also abort the Jenkins run.
     _remove_status_file()
@@ -101,6 +105,7 @@ def _remove_status_file():
 
 def _write_status_file(merge_status):
     """Write the merge status to the status file."""
+    logger.info(f'Write status {merge_status.name} to file {MERGE_UPSTREAM_STATUS}')
     with open(MERGE_UPSTREAM_STATUS, 'w') as merge_upstream_status:
         merge_upstream_status.write(merge_status.name)
 
@@ -109,6 +114,7 @@ def _write_status_file(merge_status):
 def _preserving_branch_and_commit(ctx):
     """Context manager to run complicated sets of Git commands, while returning
     to the original branch and placing that branch back onto the original commit."""
+    logger.info('Save current checkout state...')
     result = ctx.run('git rev-parse --abbrev-ref HEAD', hide='stdout')
     branch = result.stdout.strip()
     result = ctx.run('git rev-parse HEAD', hide='stdout')
@@ -116,6 +122,7 @@ def _preserving_branch_and_commit(ctx):
     try:
         yield
     finally:
+        logger.info('Restore checkout state...')
         if branch == 'HEAD':
             ctx.run(f'git checkout --quiet --detach {commit}')
             ctx.run('git reset --hard HEAD')
@@ -126,6 +133,7 @@ def _preserving_branch_and_commit(ctx):
 
 def _check_preconditions(ctx, config):
     """Check the preconditions for the merge-upstream task."""
+    logger.info('Check preconditions...')
     if platform.system() not in ['Darwin', 'Linux']:
         raise Exit('Run this task on macOS or Linux')
     # https://stackoverflow.com/a/2659808/11996393
@@ -147,6 +155,7 @@ def _merge_remote(ctx, config):
 
     Used as a context manager, cleans up the remote when done.'''
     try:
+        logger.info('Create remote to refer to destination fork...')
         result = ctx.run(f'git remote get-url {config.local_remote_name}', hide='both', warn=True, pty=False)
         if result.ok and result.stdout.strip() != '':
             ctx.run(f'git remote set-url {config.local_remote_name} {config.local_url}')
@@ -155,18 +164,22 @@ def _merge_remote(ctx, config):
         ctx.run(f'git remote update {config.local_remote_name}')
         yield
     finally:
+        logger.info('Remove remote...')
         ctx.run(f'git remote remove {config.local_remote_name}', warn=True, hide='both')
 
 
 def _branch_exists(ctx, branch):
     """Return true if the given branch exists locally"""
+    logger.info(f'Check if {branch} exists...')
     result = ctx.run(f'git rev-parse --quiet --verify {branch}', warn=True, hide='stdout')
     return result.ok
 
 
 def _merge_and_push(ctx, config):
     """Attempt to merge upstream branch and push it to the local repo."""
+    logger.info(f'Check out local {config.local_branch} branch...')
     ctx.run(f'git checkout --quiet --detach {config.local_remote_name}/{config.local_branch}')
+    logger.info('Merge upstream branch...')
     merge_result = ctx.run(f'git pull --no-ff --no-edit {config.cci_url} {config.cci_branch}', warn=True)
     if merge_result.ok:
         # Check to see if a push is necessary by counting the number of revisions
@@ -176,11 +189,14 @@ def _merge_and_push(ctx, config):
             hide='stdout', pty=False)
         needs_push = int(count_revs_result.stdout) != 0
         if needs_push:
+            logger.info('Push to local repo...')
             ctx.run(f'git push {config.local_remote_name} HEAD:refs/heads/{config.local_branch}')
             return MergeStatus.MERGED
         else:
+            logger.info('Repo is already up to date')
             return MergeStatus.UP_TO_DATE
     else:
+        logger.info('Check for merge conflicts...')
         # Check for merge conflicts: https://stackoverflow.com/a/27991004/11996393
         result = ctx.run('git ls-files -u', hide='stdout', warn=True, pty=False)
         if result.ok and result.stdout.strip():
@@ -193,6 +209,7 @@ def _form_pr_body(ctx, config):
     """Create a body for the pull request summarizing information about the merge conflicts."""
     # Note: pty=False to enforce not using a PTY; that makes sure that Git doesn't
     # see a terminal and put escapes into the output we want to format.
+    logger.info('Create body of pull request message...')
     conflict_files_result = ctx.run('git diff --no-color --name-only --diff-filter=U', hide='stdout', pty=False)
     commits_on_upstream_result = ctx.run(
         'git log --no-color --merge HEAD..MERGE_HEAD --pretty=format:"%h -%d %s (%cr) <%an>"', hide='stdout', pty=False)
@@ -226,6 +243,7 @@ def _form_pr_body(ctx, config):
 
 def _create_pull_request(ctx, config, pr_body):
     """Create a pull request to merge in the data from upstream."""
+    logger.info('Create pull request from upstream branch...')
     # Get the upstream ref
     ctx.run(f'git fetch {config.cci_url} {config.cci_branch}')
     # Push it to the fork the PR will be on. Have to include refs/heads in case the branch didn't
@@ -240,9 +258,11 @@ def _create_pull_request(ctx, config, pr_body):
         if existing_prs:
             assert len(existing_prs) == 1
             url = existing_prs[0]['url']
+            logger.info('Edit existing pull request...')
             ctx.run(f'gh pr edit --repo {config.local_host}/{config.local_organization}/conan-center-index '
                     f'{url} --body-file {pr_body_file.name}')
         else:
+            logger.info('Create new pull request...')
             title = shlex.quote('Merge in changes from conan-io/master')
             labels = f' --label {",".join(config.pr_labels)}' if config.pr_labels else ''
             assignee = f' --assignee {config.pr_assignee}' if config.pr_assignee else ''
@@ -255,6 +275,7 @@ def _create_pull_request(ctx, config, pr_body):
 
 
 def _list_merge_pull_requests(ctx, config):
+    logger.info('Check for existing pull requests...')
     result = ctx.run(f'gh pr list --repo {config.local_host}/{config.local_organization}/conan-center-index '
                      '--json number,url,author,headRefName,headRepositoryOwner ',
                      hide='stdout',

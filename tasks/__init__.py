@@ -3,12 +3,18 @@ import io
 import os
 from concurrent import futures
 
+import coloredlogs
 import yaml
 from dl_conan_build_tools.tasks import conan
 from invoke import Collection, Exit
 from invoke.tasks import Task, task
 
 from . import merging
+
+TASKS_FIELD_STYLES = coloredlogs.DEFAULT_FIELD_STYLES.copy()
+TASKS_FIELD_STYLES.update(levelname=dict(color='magenta', bold=True))
+coloredlogs.install(field_styles=TASKS_FIELD_STYLES,
+                    fmt='%(asctime)s %(funcName)s %(name)s[%(process)d] %(levelname)s %(message)s')
 
 
 @task(help={'remote': 'remote to upload to, default conan-center-dl-staging',
