@@ -76,10 +76,10 @@ def merge_upstream(ctx):
     _check_preconditions(ctx, config)
     print(f'Configuration: {config}')
 
-    with _preserving_branch_and_commit(ctx):
-        _remove_status_file()
-
-        _update_remote(ctx, config)
+    # if anything fails past this point, the missing status file will also abort the Jenkins run.
+    _remove_status_file()
+    # Nested context handlers; see https://docs.python.org/3.10/reference/compound_stmts.html#the-with-statement
+    with _preserving_branch_and_commit(ctx), _merge_remote(ctx, config):
         _update_branch(ctx, config)
 
         # Try to merge from CCI
@@ -141,15 +141,22 @@ def _check_preconditions(ctx, config):
                    f'see https://cli.github.com/manual/gh_auth_login')
 
 
-def _update_remote(ctx, config):
+@contextlib.contextmanager
+def _merge_remote(ctx, config):
     '''Make merge-local-remote point to the repo we're going to merge into
-    This also makes it work in CI, where there might not be an "upstream"'''
-    result = ctx.run(f'git remote get-url {config.local_remote_name}', hide='both', warn=True, pty=False)
-    if result.ok and result.stdout.strip() != '':
-        ctx.run(f'git remote set-url {config.local_remote_name} {config.local_url}')
-    else:
-        ctx.run(f'git remote add {config.local_remote_name} {config.local_url}')
-    ctx.run(f'git remote update {config.local_remote_name}')
+    This also makes it work in CI, where there might not be an "upstream".
+
+    Used as a context manager, cleans up the remote when done.'''
+    try:
+        result = ctx.run(f'git remote get-url {config.local_remote_name}', hide='both', warn=True, pty=False)
+        if result.ok and result.stdout.strip() != '':
+            ctx.run(f'git remote set-url {config.local_remote_name} {config.local_url}')
+        else:
+            ctx.run(f'git remote add {config.local_remote_name} {config.local_url}')
+        ctx.run(f'git remote update {config.local_remote_name}')
+        yield
+    finally:
+        ctx.run(f'git remote remove {config.local_remote_name}', warn=True, hide='both')
 
 
 def _branch_exists(ctx, branch):
