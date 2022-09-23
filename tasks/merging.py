@@ -80,8 +80,6 @@ def merge_upstream(ctx):
     _remove_status_file()
     # Nested context handlers; see https://docs.python.org/3.10/reference/compound_stmts.html#the-with-statement
     with _preserving_branch_and_commit(ctx), _merge_remote(ctx, config):
-        _update_branch(ctx, config)
-
         # Try to merge from CCI
         try:
             _write_status_file(_merge_and_push(ctx, config))
@@ -119,9 +117,10 @@ def _preserving_branch_and_commit(ctx):
         yield
     finally:
         if branch == 'HEAD':
-            ctx.run(f'git checkout --detach {commit}')
+            ctx.run(f'git checkout --quiet --detach {commit}')
+            ctx.run('git reset --hard HEAD')
         else:
-            ctx.run(f'git checkout --force {branch}')
+            ctx.run(f'git checkout --quiet --force {branch}')
             ctx.run(f'git reset --hard {commit}')
 
 
@@ -165,17 +164,9 @@ def _branch_exists(ctx, branch):
     return result.ok
 
 
-def _update_branch(ctx, config):
-    """Check out and update branch"""
-    if _branch_exists(ctx, config.local_branch):
-        ctx.run(f'git checkout {config.local_branch}')
-        ctx.run(f'git reset --hard {config.local_remote_name}/{config.local_branch}')
-    else:
-        ctx.run(f'git checkout --track {config.local_remote_name}/{config.local_branch}')
-
-
 def _merge_and_push(ctx, config):
     """Attempt to merge upstream branch and push it to the local repo."""
+    ctx.run(f'git checkout --quiet --detach {config.local_remote_name}/{config.local_branch}')
     merge_result = ctx.run(f'git pull --no-ff --no-edit {config.cci_url} {config.cci_branch}', warn=True)
     if merge_result.ok:
         # Check to see if a push is necessary by counting the number of revisions
@@ -185,7 +176,7 @@ def _merge_and_push(ctx, config):
             hide='stdout', pty=False)
         needs_push = int(count_revs_result.stdout) != 0
         if needs_push:
-            ctx.run(f'git push {config.local_remote_name} {config.local_branch}')
+            ctx.run(f'git push {config.local_remote_name} HEAD:refs/heads/{config.local_branch}')
             return MergeStatus.MERGED
         else:
             return MergeStatus.UP_TO_DATE
