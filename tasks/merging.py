@@ -235,15 +235,11 @@ def _form_pr_body(ctx, config):
 
 def _create_pull_request(ctx, config, pr_body):
     """Create a pull request to merge in the data from upstream."""
-    # Get on a merge branch
+    # Get the upstream ref
     ctx.run(f'git fetch {config.cci_url} {config.cci_branch}')
-    if _branch_exists(ctx, config.merge_branch_name):
-        ctx.run(f'git checkout {config.merge_branch_name}')
-        ctx.run('git reset --hard FETCH_HEAD')
-    else:
-        ctx.run(f'git checkout -b {config.merge_branch_name} FETCH_HEAD')
-
-    ctx.run(f'git push --force {config.fork_url} {config.merge_branch_name}')
+    # Push it to the fork the PR will be on. Have to include refs/heads in case the branch didn't
+    # already exist
+    ctx.run(f'git push --force {config.fork_url} FETCH_HEAD:refs/heads/{config.merge_branch_name}')
     with tempfile.NamedTemporaryFile(prefix='pr-body', mode='w+', encoding='utf-8') as pr_body_file:
         pr_body_file.write(pr_body)
         # Before passing the filename to gh pr create, flush it so all the data is on the disk
