@@ -47,7 +47,7 @@ pipeline {
     triggers {
         // From the doc: @midnight actually means some time between 12:00 AM and 2:59 AM.
         // This gives us automatic spreading out of jobs, so they don't cause load spikes.
-        cron('@midnight')
+        parameterizedCron(env.BRANCH_NAME =~ 'develop*' ? '@midnight % MERGE_UPSTREAM=true' : '@midnight')
     }
     environment {
         CONAN_USER_HOME = "${WORKSPACE}"
@@ -184,8 +184,9 @@ pipeline {
         stage('Merge from upstream') {
             when {
                 expression {
-                    // Merge upstream on develop-prefixed branches if triggered by timer, or forced by parameter
-                    env.BRANCH_NAME =~ 'develop*' && (currentBuild.getBuildCauses('hudson.triggers.TimerTrigger$TimerTriggerCause') || params.MERGE_UPSTREAM)
+                    // Merge upstream on develop-prefixed branches if forced by parameter
+                    // The parametrized Cron timer sets MERGE_UPSTREAM at appropriate times.
+                    env.BRANCH_NAME =~ 'develop*' && params.MERGE_UPSTREAM
                 }
             }
             steps {
