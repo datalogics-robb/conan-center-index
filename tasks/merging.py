@@ -180,7 +180,11 @@ def _merge_and_push(ctx, config):
     logger.info(f'Check out local {config.local_branch} branch...')
     ctx.run(f'git checkout --quiet --detach {config.local_remote_name}/{config.local_branch}')
     logger.info('Merge upstream branch...')
-    merge_result = ctx.run(f'git pull --no-ff --no-edit {config.cci_url} {config.cci_branch}', warn=True)
+    ctx.run(f'git fetch {config.cci_url} {config.cci_branch}')
+    # --into name sets the branch name so it says "...into develop" instead of "...into HEAD"
+    # Have to fetch and use FETCH_HEAD because --into-name isn't available on git pull
+    merge_result = ctx.run(
+        f'git merge --no-ff --no-edit --into-name {config.local_branch} FETCH_HEAD', warn=True)
     if merge_result.ok:
         # Check to see if a push is necessary by counting the number of revisions
         # that differ between current head and the push destination.
