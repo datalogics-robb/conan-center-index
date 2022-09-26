@@ -59,3 +59,20 @@ repos:
                     - mdformat-frontmatter
                     - mdformat-footnote
                     - mdformat-toc
+    # pylint has to be run from inside the virtual environment, so it has access to all
+    # the modules imported by a given Python modules.
+    # See: https://pylint.pycqa.org/en/latest/user_guide/installation/pre-commit-integration.html#pre-commit-integration
+    -   repo: local
+        hooks:
+            -   id: pylint
+                name: pylint
+                entry: pylint
+                language: system
+                types: [ python ]
+                # only tasks are linted at present
+                files: ^tasks/.*$
+                args:
+                  [
+                      "-rn", # only display messages
+                      "-sn", # don't display the score
+                  ]

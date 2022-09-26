@@ -1,3 +1,4 @@
+# pylint: disable=all
 import importlib
 import io
 import os

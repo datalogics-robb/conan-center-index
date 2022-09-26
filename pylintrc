@@ -42,7 +42,7 @@ fail-under=10
 #from-stdin=
 
 # Files or directories to be skipped. They should be base names, not paths.
-ignore=CVS
+ignore=.git,.tox,.idea,.conan,recipes,.github,docs,linter,.mkenv,mkenv.py,.cache,tests
 
 # Add files or directories matching the regular expressions patterns to the
 # ignore-list. The regex matches against paths and can be in Posix or Windows
@@ -53,7 +53,7 @@ ignore-paths=
 # Files or directories matching the regular expression patterns are skipped.
 # The regex matches against base names, not paths. The default value ignores
 # Emacs file locks
-ignore-patterns=^\.#
+ignore-patterns=^(\.#|python-env-)
 
 # List of module names for which member attributes should not be checked
 # (useful for modules/projects where namespaces are manipulated during runtime
@@ -78,6 +78,16 @@ limit-inference-results=100
 # List of plugins (as comma separated values of python module names) to load,
 # usually to register additional checkers.
 load-plugins=
+    pylint.extensions.confusing_elif,
+    pylint.extensions.for_any_all,
+    pylint.extensions.consider_ternary_expression,
+    pylint.extensions.check_elif,
+    pylint.extensions.private_import,
+    pylint.extensions.redefined_variable_type,
+    pylint.extensions.overlapping_exceptions,
+    pylint.extensions.redefined_loop_name,
+    pylint.extensions.set_membership,
+    pylint.extensions.typing
 
 # Pickle collected data for later comparisons.
 persistent=yes
@@ -336,7 +346,7 @@ indent-after-paren=4
 indent-string='    '
 
 # Maximum number of characters on a single line.
-max-line-length=100
+max-line-length=120
 
 # Maximum number of lines in a module.
 max-module-lines=1000
