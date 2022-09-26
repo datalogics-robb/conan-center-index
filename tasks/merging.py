@@ -12,6 +12,7 @@ import textwrap
 from enum import Enum, auto
 from typing import Optional
 
+import dacite
 import yaml
 from invoke import Exit, Task, UnexpectedExit
 
@@ -38,27 +39,65 @@ class MergeStatus(Enum):
 
 
 @dataclasses.dataclass
+class ConanCenterIndexConfig:
+    """Configuration for Conan Center Index"""
+    url: str = 'git@github.com:conan-io/conan-center-index.git'
+    """URL for the Conan Center Index"""
+    branch: str = 'master'
+    """Branch to fetch from"""
+
+
+@dataclasses.dataclass
+class UpstreamConfig:
+    """Configuration describing parameters for the upstream repo. (usually Datalogics)"""
+    host: str = 'octocat.dlogics.com'
+    """Host for the Datalogics upstream"""
+    organization: str = 'datalogics'
+    """Name of the upstream organization"""
+    branch: str = 'develop'
+    """Name of the branch that Conan Center Index is merged to"""
+    remote_name: str = 'merge-upstream-remote'
+    """Name of a temporary remote to create to do the work"""
+
+    @property
+    def url(self) -> str:
+        """The URL for the upstream Git repository."""
+        return f'git@{self.host}:{self.organization}/conan-center-index.git'
+
+
+@dataclasses.dataclass
+class PullRequestConfig:
+    """Configuration describing parameters for the pull request"""
+    host: str = 'octocat.dlogics.com'
+    """Host for the pull request"""
+    fork: str = getpass.getuser()
+    """The fork to create the pull request on."""
+    merge_branch_name: str = 'merge-from-conan-io'
+    """The name of the head branch to create"""
+    reviewers: list[str] = dataclasses.field(default_factory=list)
+    """A list of usernames from which to request reviews"""
+    assignee: Optional[str] = None
+    """A username to be the assignee"""
+    labels: list[str] = dataclasses.field(default_factory=lambda: ['from-conan-io'])
+    """Labels to place on the pull request"""
+
+    @property
+    def url(self) -> str:
+        """Return the URL to push to for the pull request."""
+        return f'git@{self.host}:{self.fork}/conan-center-index.git'
+
+
+@dataclasses.dataclass
 class MergeUpstreamConfig:
     """Configuration for the merge-upstream task."""
-    cci_url: str = 'git@github.com:conan-io/conan-center-index.git'
-    cci_branch: str = 'master'
-    local_host: str = 'octocat.dlogics.com'
-    local_organization: str = 'kam'  # TODO: datalogics
-    local_branch: str = 'develop'
-    local_remote_name: str = 'merge-local-remote'
-    local_fork: str = getpass.getuser()
-    merge_branch_name: str = 'merge-from-conan-io'
-    pr_reviewers: list[str] = dataclasses.field(default_factory=list)
-    pr_assignee: Optional[str] = None
-    pr_labels: list[str] = dataclasses.field(default_factory=lambda: ['from-conan-io'])
+    cci: ConanCenterIndexConfig = dataclasses.field(default_factory=ConanCenterIndexConfig)
+    """Configuration for Conan Center Index"""
+    upstream: UpstreamConfig = dataclasses.field(default_factory=UpstreamConfig)
+    """Configuration for the Datalogics upstream"""
+    pull_request: PullRequestConfig = dataclasses.field(default_factory=PullRequestConfig)
 
-    @property
-    def local_url(self) -> str:
-        return f'git@{self.local_host}:{self.local_organization}/conan-center-index.git'
-
-    @property
-    def fork_url(self) -> str:
-        return f'git@{self.local_host}:{self.local_fork}/conan-center-index.git'
+    class ConfigurationError(Exception):
+        """Configuration error when reading data."""
 
     @classmethod
     def create_from_dlproject(cls):
@@ -66,7 +105,20 @@ class MergeUpstreamConfig:
         with open('dlproject.yaml') as dlproject_file:
             dlproject = yaml.safe_load(dlproject_file)
         config_data = dlproject.get('merge_upstream', dict())
-        return dataclasses.replace(cls(), **config_data)
+        try:
+            return dacite.from_dict(data_class=MergeUpstreamConfig,
+                                    data=config_data,
+                                    config=dacite.Config(strict=True))
+        except dacite.DaciteError as exception:
+            raise cls.ConfigurationError(
+                f'Error reading merge_upstream from dlproject.yaml: {exception}') from exception
+
+    def asyaml(self):
+        """Return a string containing the yaml for this dataclass,
+        in canonical form."""
+        # sort_keys=False to preserve the ordering that's in the dataclasses
+        # dict objects preserve order since Python 3.7
+        return yaml.dump(dataclasses.asdict(self), sort_keys=False, indent=4)
 
 
 @Task
@@ -78,7 +130,7 @@ def merge_upstream(ctx):
     '''
     config = MergeUpstreamConfig.create_from_dlproject()
     _check_preconditions(ctx, config)
-    logger.info(f'merge-upstream configuration: {config}')
+    logger.info('merge-upstream configuration:\n%s', config.asyaml())
 
     # if anything fails past this point, the missing status file will also abort the Jenkins run.
     _remove_status_file()
@@ -142,9 +194,9 @@ def _check_preconditions(ctx, config):
         raise Exit('The local worktree has uncommitted changes')
     if not shutil.which('gh'):
         raise Exit('This task requires the GitHub CLI. See installation instructions at https://cli.github.com/')
-    result = ctx.run(f'gh auth status --hostname {config.local_host}', warn=True)
+    result = ctx.run(f'gh auth status --hostname {config.upstream.host}', warn=True)
     if not result.ok:
-        raise Exit(f'GitHub CLI must be logged in to {config.local_host}, or a token supplied in GH_TOKEN; '
+        raise Exit(f'GitHub CLI must be logged in to {config.upstream.host}, or a token supplied in GH_TOKEN; '
                    f'see https://cli.github.com/manual/gh_auth_login')
 
 
@@ -156,16 +208,16 @@ def _merge_remote(ctx, config):
     Used as a context manager, cleans up the remote when done.'''
     try:
         logger.info('Create remote to refer to destination fork...')
-        result = ctx.run(f'git remote get-url {config.local_remote_name}', hide='both', warn=True, pty=False)
+        result = ctx.run(f'git remote get-url {config.upstream.remote_name}', hide='both', warn=True, pty=False)
         if result.ok and result.stdout.strip() != '':
-            ctx.run(f'git remote set-url {config.local_remote_name} {config.local_url}')
+            ctx.run(f'git remote set-url {config.upstream.remote_name} {config.upstream.url}')
         else:
-            ctx.run(f'git remote add {config.local_remote_name} {config.local_url}')
-        ctx.run(f'git remote update {config.local_remote_name}')
+            ctx.run(f'git remote add {config.upstream.remote_name} {config.upstream.url}')
+        ctx.run(f'git remote update {config.upstream.remote_name}')
         yield
     finally:
         logger.info('Remove remote...')
-        ctx.run(f'git remote remove {config.local_remote_name}', warn=True, hide='both')
+        ctx.run(f'git remote remove {config.upstream.remote_name}', warn=True, hide='both')
 
 
 def _branch_exists(ctx, branch):
@@ -177,24 +229,24 @@ def _branch_exists(ctx, branch):
 
 def _merge_and_push(ctx, config):
     """Attempt to merge upstream branch and push it to the local repo."""
-    logger.info(f'Check out local {config.local_branch} branch...')
-    ctx.run(f'git checkout --quiet --detach {config.local_remote_name}/{config.local_branch}')
+    logger.info(f'Check out local {config.upstream.branch} branch...')
+    ctx.run(f'git checkout --quiet --detach {config.upstream.remote_name}/{config.upstream.branch}')
     logger.info('Merge upstream branch...')
-    ctx.run(f'git fetch {config.cci_url} {config.cci_branch}')
+    ctx.run(f'git fetch {config.cci.url} {config.cci.branch}')
     # --into name sets the branch name so it says "...into develop" instead of "...into HEAD"
     # Have to fetch and use FETCH_HEAD because --into-name isn't available on git pull
     merge_result = ctx.run(
-        f'git merge --no-ff --no-edit --into-name {config.local_branch} FETCH_HEAD', warn=True)
+        f'git merge --no-ff --no-edit --into-name {config.upstream.branch} FETCH_HEAD', warn=True)
     if merge_result.ok:
         # Check to see if a push is necessary by counting the number of revisions
         # that differ between current head and the push destination.
         count_revs_result = ctx.run(
-            f'git rev-list {config.local_remote_name}/{config.local_branch}..HEAD --count',
+            f'git rev-list {config.upstream.remote_name}/{config.upstream.branch}..HEAD --count',
             hide='stdout', pty=False)
         needs_push = int(count_revs_result.stdout) != 0
         if needs_push:
             logger.info('Push to local repo...')
-            ctx.run(f'git push {config.local_remote_name} HEAD:refs/heads/{config.local_branch}')
+            ctx.run(f'git push {config.upstream.remote_name} HEAD:refs/heads/{config.upstream.branch}')
             return MergeStatus.MERGED
         else:
             logger.info('Repo is already up to date')
@@ -237,7 +289,7 @@ def _form_pr_body(ctx, config):
         ### Commits for conflict files, local
 
         {commits_local}
-    ''').format(local_branch=config.local_branch,
+    ''').format(local_branch=config.upstream.branch,
                 conflict_files=conflict_files_result.stdout,
                 commits_on_upstream=commits_on_upstream_result.stdout,
                 commits_local=commits_local_result.stdout)
@@ -249,10 +301,11 @@ def _create_pull_request(ctx, config, pr_body):
     """Create a pull request to merge in the data from upstream."""
     logger.info('Create pull request from upstream branch...')
     # Get the upstream ref
-    ctx.run(f'git fetch {config.cci_url} {config.cci_branch}')
+    ctx.run(f'git fetch {config.cci.url} {config.cci.branch}')
     # Push it to the fork the PR will be on. Have to include refs/heads in case the branch didn't
     # already exist
-    ctx.run(f'git push --force {config.fork_url} FETCH_HEAD:refs/heads/{config.merge_branch_name}')
+    ctx.run(f'git push --force {config.pull_request.url} '
+            f'FETCH_HEAD:refs/heads/{config.pull_request.merge_branch_name}')
     with tempfile.NamedTemporaryFile(prefix='pr-body', mode='w+', encoding='utf-8') as pr_body_file:
         pr_body_file.write(pr_body)
         # Before passing the filename to gh pr create, flush it so all the data is on the disk
@@ -263,28 +316,29 @@ def _create_pull_request(ctx, config, pr_body):
             assert len(existing_prs) == 1
             url = existing_prs[0]['url']
             logger.info('Edit existing pull request...')
-            ctx.run(f'gh pr edit --repo {config.local_host}/{config.local_organization}/conan-center-index '
+            ctx.run(f'gh pr edit --repo {config.upstream.host}/{config.upstream.organization}/conan-center-index '
                     f'{url} --body-file {pr_body_file.name}')
         else:
             logger.info('Create new pull request...')
             title = shlex.quote('Merge in changes from conan-io/master')
-            labels = f' --label {",".join(config.pr_labels)}' if config.pr_labels else ''
-            assignee = f' --assignee {config.pr_assignee}' if config.pr_assignee else ''
-            reviewer = f' --reviewer {",".join(config.pr_reviewers)}' if config.pr_reviewers else ''
-            ctx.run(f'gh pr create --repo {config.local_host}/{config.local_organization}/conan-center-index '
-                    f'--base {config.local_branch} '
+            labels = f' --label {",".join(config.pull_request.labels)}' if config.pull_request.labels else ''
+            assignee = f' --assignee {config.pull_request.assignee}' if config.pull_request.assignee else ''
+            reviewer = f' --reviewer {",".join(config.pull_request.reviewers)}' if config.pull_request.reviewers else ''
+            ctx.run(f'gh pr create --repo {config.upstream.host}/{config.upstream.organization}/conan-center-index '
+                    f'--base {config.upstream.branch} '
                     f'--title {title} --body-file {pr_body_file.name} '
-                    f'--head {config.local_fork}:{config.merge_branch_name}'
+                    f'--head {config.pull_request.fork}:{config.pull_request.merge_branch_name}'
                     f'{labels}{assignee}{reviewer}')
 
 
 def _list_merge_pull_requests(ctx, config):
     logger.info('Check for existing pull requests...')
-    result = ctx.run(f'gh pr list --repo {config.local_host}/{config.local_organization}/conan-center-index '
+    result = ctx.run(f'gh pr list --repo {config.upstream.host}/{config.upstream.organization}/conan-center-index '
                      '--json number,url,author,headRefName,headRepositoryOwner ',
                      hide='stdout',
                      pty=False)
     out = result.stdout.strip()
     requests = json.loads(out) if out else []
-    return [r for r in requests if
-            r['headRefName'] == config.merge_branch_name and r['headRepositoryOwner']['login'] == config.local_fork]
+    branch_name = config.pull_request.merge_branch_name
+    fork = config.pull_request.fork
+    return [r for r in requests if r['headRefName'] == branch_name and r['headRepositoryOwner']['login'] == fork]
