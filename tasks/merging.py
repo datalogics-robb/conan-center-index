@@ -128,6 +128,9 @@ def merge_upstream(ctx):
 
     If the merge does not succeed, it will open a pull request against the destination
     repository, assigning the PR, and requesting reviewers.
+
+    To make a file always keep DL's version in a merge, add it to .gitattributes-merge
+    with the attribute merge=ours.
     '''
     config = MergeUpstreamConfig.create_from_dlproject()
     _check_preconditions(ctx, config)
@@ -236,8 +239,21 @@ def _merge_and_push(ctx, config):
     ctx.run(f'git fetch {config.cci.url} {config.cci.branch}')
     # --into name sets the branch name so it says "...into develop" instead of "...into HEAD"
     # Have to fetch and use FETCH_HEAD because --into-name isn't available on git pull
+    #
+    # For files in .gitattributes-merge that have merge=ours, resolve in favor of
+    # our changes. These files have been "taken over" from GitHub.
     merge_result = ctx.run(
-        f'git merge --no-ff --no-edit --into-name {config.upstream.branch} FETCH_HEAD', warn=True)
+        'git '
+        # Add the attributes in .gitattributes-merge to the list of attributes,
+        # see https://www.git-scm.com/docs/git-config#Documentation/git-config.txt-coreattributesFile
+        '-c core.attributesFile=.gitattributes-merge '
+        # Add a custom merge driver 'ours' which keeps just the file on HEAD, favoring
+        # our version of those files.
+        # See the section "Merge Strategies" at the end of
+        # https://www.git-scm.com/book/en/v2/Customizing-Git-Git-Attributes
+        '-c merge.ours.driver=true '
+        f'merge --no-ff --no-edit --into-name {config.upstream.branch} FETCH_HEAD',
+        warn=True)
     if merge_result.ok:
         # Check to see if a push is necessary by counting the number of revisions
         # that differ between current head and the push destination.
