@@ -1,3 +1,4 @@
+"""Tasks and supporting functions related to merging branches."""
 import contextlib
 import dataclasses
 import getpass
@@ -24,7 +25,7 @@ logger.setLevel(logging.INFO)
 
 
 class MergeHadConflicts(Exception):
-    pass
+    """Thrown when the merge had conflicts. Usually handled by making a pull request."""
 
 
 class MergeStatus(Enum):
@@ -102,9 +103,9 @@ class MergeUpstreamConfig:
     @classmethod
     def create_from_dlproject(cls):
         """Create a MergeUpstreamConfig with defaults updated from dlproject.yaml"""
-        with open('dlproject.yaml') as dlproject_file:
+        with open('dlproject.yaml', encoding='utf-8') as dlproject_file:
             dlproject = yaml.safe_load(dlproject_file)
-        config_data = dlproject.get('merge_upstream', dict())
+        config_data = dlproject.get('merge_upstream', {})
         try:
             return dacite.from_dict(data_class=MergeUpstreamConfig,
                                     data=config_data,
@@ -157,8 +158,8 @@ def _remove_status_file():
 
 def _write_status_file(merge_status):
     """Write the merge status to the status file."""
-    logger.info(f'Write status {merge_status.name} to file {MERGE_UPSTREAM_STATUS}')
-    with open(MERGE_UPSTREAM_STATUS, 'w') as merge_upstream_status:
+    logger.info('Write status %s to file %s', merge_status.name, MERGE_UPSTREAM_STATUS)
+    with open(MERGE_UPSTREAM_STATUS, 'w', encoding='utf-8') as merge_upstream_status:
         merge_upstream_status.write(merge_status.name)
 
 
@@ -222,14 +223,14 @@ def _merge_remote(ctx, config):
 
 def _branch_exists(ctx, branch):
     """Return true if the given branch exists locally"""
-    logger.info(f'Check if {branch} exists...')
+    logger.info('Check if %s exists...', branch)
     result = ctx.run(f'git rev-parse --quiet --verify {branch}', warn=True, hide='stdout')
     return result.ok
 
 
 def _merge_and_push(ctx, config):
     """Attempt to merge upstream branch and push it to the local repo."""
-    logger.info(f'Check out local {config.upstream.branch} branch...')
+    logger.info('Check out local %s branch...', config.upstream.branch)
     ctx.run(f'git checkout --quiet --detach {config.upstream.remote_name}/{config.upstream.branch}')
     logger.info('Merge upstream branch...')
     ctx.run(f'git fetch {config.cci.url} {config.cci.branch}')
@@ -243,22 +244,19 @@ def _merge_and_push(ctx, config):
         count_revs_result = ctx.run(
             f'git rev-list {config.upstream.remote_name}/{config.upstream.branch}..HEAD --count',
             hide='stdout', pty=False)
-        needs_push = int(count_revs_result.stdout) != 0
-        if needs_push:
-            logger.info('Push to local repo...')
-            ctx.run(f'git push {config.upstream.remote_name} HEAD:refs/heads/{config.upstream.branch}')
-            return MergeStatus.MERGED
-        else:
+        if int(count_revs_result.stdout) == 0:
             logger.info('Repo is already up to date')
             return MergeStatus.UP_TO_DATE
-    else:
-        logger.info('Check for merge conflicts...')
-        # Check for merge conflicts: https://stackoverflow.com/a/27991004/11996393
-        result = ctx.run('git ls-files -u', hide='stdout', warn=True, pty=False)
-        if result.ok and result.stdout.strip():
-            raise MergeHadConflicts
-        # Something else went wrong with the merge
-        raise UnexpectedExit(merge_result)
+        logger.info('Push to local repo...')
+        ctx.run(f'git push {config.upstream.remote_name} HEAD:refs/heads/{config.upstream.branch}')
+        return MergeStatus.MERGED
+    logger.info('Check for merge conflicts...')
+    # Check for merge conflicts: https://stackoverflow.com/a/27991004/11996393
+    result = ctx.run('git ls-files -u', hide='stdout', warn=True, pty=False)
+    if result.ok and result.stdout.strip():
+        raise MergeHadConflicts
+    # Something else went wrong with the merge
+    raise UnexpectedExit(merge_result)
 
 
 def _form_pr_body(ctx, config):
