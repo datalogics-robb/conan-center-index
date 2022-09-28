@@ -25,6 +25,8 @@ pipeline {
                          'windows-conan-center-index'],
                description: 'Run on specific platform')
         booleanParam defaultValue: false, description: 'Completely clean the workspace before building, including the Conan cache', name: 'CLEAN_WORKSPACE'
+        string(name: 'PYTEST_OPTIONS', defaultValue: '',
+            description: 'Additional parameters for pytest, for instance, work on just swig with -k swig. See: https://docs.pytest.org/en/7.1.x/how-to/usage.html')
         booleanParam name: 'UPLOAD_ALL_RECIPES', defaultValue: false,
             description: 'Upload all recipes, instead of only recipes that changed since the last merge'
         booleanParam name: 'FORCE_TOOL_BUILD', defaultValue: false,
@@ -368,7 +370,7 @@ pipeline {
                                 } else {
                                     force_build = ''
                                 }
-                                def pytest_command = "pytest -k build_tool ${force_build} ${upload} --junitxml=build-tools.xml --html=${short_node}-build-tools.html"
+                                def pytest_command = "pytest -k build_tool ${force_build} ${upload} --junitxml=build-tools.xml --html=${short_node}-build-tools.html ${params.PYTEST_OPTIONS}"
                                 if (isUnix()) {
                                     catchError(message: 'pytest had errors', stageResult: 'FAILURE') {
                                         script {
