@@ -122,6 +122,15 @@ class MergeUpstreamConfig:
         return yaml.dump(dataclasses.asdict(self), sort_keys=False, indent=4)
 
 
+@dataclasses.dataclass
+class GitFileStatus:
+    """A Git status"""
+    status: str
+    """A Git short status string, see https://git-scm.com/docs/git-status#_short_format"""
+    path: str
+    """A file path, which may be two paths separated by -> if a rename or copy"""
+
+
 @Task
 def merge_upstream(ctx):
     '''Merge updated recipes and other files from conan-io/conan-center-index.
@@ -252,27 +261,67 @@ def _merge_and_push(ctx, config):
         # See the section "Merge Strategies" at the end of
         # https://www.git-scm.com/book/en/v2/Customizing-Git-Git-Attributes
         '-c merge.ours.driver=true '
-        f'merge --no-ff --no-edit --into-name {config.upstream.branch} FETCH_HEAD',
+        f'merge --no-ff --no-edit --no-verify --into-name {config.upstream.branch} FETCH_HEAD',
         warn=True)
     if merge_result.ok:
-        # Check to see if a push is necessary by counting the number of revisions
-        # that differ between current head and the push destination.
-        count_revs_result = ctx.run(
-            f'git rev-list {config.upstream.remote_name}/{config.upstream.branch}..HEAD --count',
-            hide='stdout', pty=False)
-        if int(count_revs_result.stdout) == 0:
-            logger.info('Repo is already up to date')
-            return MergeStatus.UP_TO_DATE
-        logger.info('Push to local repo...')
-        ctx.run(f'git push {config.upstream.remote_name} HEAD:refs/heads/{config.upstream.branch}')
-        return MergeStatus.MERGED
-    logger.info('Check for merge conflicts...')
-    # Check for merge conflicts: https://stackoverflow.com/a/27991004/11996393
-    result = ctx.run('git ls-files -u', hide='stdout', warn=True, pty=False)
-    if result.ok and result.stdout.strip():
+        return _maybe_push(ctx, config)
+    conflicts = _retrieve_merge_conflicts(ctx)
+    if not conflicts:
+        # Something else went wrong with the merge
+        raise UnexpectedExit(merge_result)
+    _remove_files_deleted_by_us(ctx, conflicts)
+    conflicts = _retrieve_merge_conflicts(ctx)
+    if conflicts:
         raise MergeHadConflicts
-    # Something else went wrong with the merge
-    raise UnexpectedExit(merge_result)
+    logger.info('Commit merge with resolved conflicts...')
+    # Finish the merge by committing. --no-verify is necessary to avoid running commit
+    # hooks, which aren't run on merge commits that succeed.
+    ctx.run('git commit --no-edit --no-verify')
+    return _maybe_push(ctx, config)
+
+
+def _remove_files_deleted_by_us(ctx, conflicts):
+    """Examine conflicts for files deleted by us (status DU) and remove them with 'git rm'.
+    This may clear enough of the conflicts to allow auto-merging to continue."""
+    logger.info('Removing conflict files deleted by us...')
+    for conflict in conflicts:
+        if conflict.status == 'DU':  # we deleted, they modified (unmerged)
+            ctx.run(f'git rm {conflict.path}')
+
+
+def _retrieve_merge_conflicts(ctx):
+    """Get a list of merge conflicts, from the current status.
+    Returns a tuple of (code, path), where code is a combination
+    of D (deleted) A (added) and U (unmerged).
+
+    DD: unmerged, both deleted
+    AU: unmerged, added by us
+    UD: unmerged, deleted by them
+    UA: unmerged, added by them
+    DU: unmerged, deleted by us
+    AA: unmerged, both added
+    UU: unmerged, both modified
+
+    See: https://git-scm.com/docs/git-status#_short_format"""
+    logger.info('Check for merge conflicts...')
+    result = ctx.run('git status --porcelain=v1', pty=False, hide='stdout')
+    status_entries = [GitFileStatus(*line.split(maxsplit=1)) for line in result.stdout.splitlines()]
+    conflict_statuses = {'DD', 'AU', 'UD', 'UA', 'DU', 'AA', 'UU'}
+    return [entry for entry in status_entries if entry.status in conflict_statuses]
+
+
+def _maybe_push(ctx, config):
+    """Check to see if a push is necessary by counting the number of revisions
+    that differ between current head and the push destination. Push if necessary"""
+    count_revs_result = ctx.run(
+        f'git rev-list {config.upstream.remote_name}/{config.upstream.branch}..HEAD --count',
+        hide='stdout', pty=False)
+    if int(count_revs_result.stdout) == 0:
+        logger.info('Repo is already up to date')
+        return MergeStatus.UP_TO_DATE
+    logger.info('Push to local repo...')
+    ctx.run(f'git push {config.upstream.remote_name} HEAD:refs/heads/{config.upstream.branch}')
+    return MergeStatus.MERGED
 
 
 def _form_pr_body(ctx, config):
