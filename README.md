@@ -10,6 +10,7 @@ It also has Invoke tasks and CI implementations that:
 - Upload recipes to our own repositories on Artifactory.
 - Pre-build tools with specific profiles and upload them to Artifactory.
 
-# DL Documentation
+## DL Documentation
 
-- [Automatically Resolved Merge Conflicts](dl-docs/auto-merge-conflict-resolution.md)
+- [`merge-upstream` task](dl-docs/merge-upstream.md)
+  - [Automatically Resolved Merge Conflicts](dl-docs/auto-merge-conflict-resolution.md)
