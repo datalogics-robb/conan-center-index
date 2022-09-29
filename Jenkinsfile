@@ -12,6 +12,10 @@ def BUILD_TOOLS=[
     'windows-conan-center-index': true,
 ]
 def skipBuilding = false
+// Don't upload things if the job name has 'test' in it
+// Converting matcher to boolean with asBoolean() or find(): https://stackoverflow.com/a/35529715/11996393
+def upload_ok = ! (env.JOB_NAME =~ 'test').find()
+
 pipeline {
     parameters {
         choice(name: 'PLATFORM_FILTER',
@@ -49,7 +53,7 @@ pipeline {
     triggers {
         // From the doc: @midnight actually means some time between 12:00 AM and 2:59 AM.
         // This gives us automatic spreading out of jobs, so they don't cause load spikes.
-        parameterizedCron(env.BRANCH_NAME =~ 'develop*' ? '@midnight % MERGE_UPSTREAM=true' : '@midnight')
+        parameterizedCron(env.BRANCH_NAME =~ 'develop' ? '@midnight % MERGE_UPSTREAM=true' : '@midnight')
     }
     environment {
         CONAN_USER_HOME = "${WORKSPACE}"
@@ -188,7 +192,7 @@ pipeline {
                 expression {
                     // Merge upstream on develop-prefixed branches if forced by parameter
                     // The parametrized Cron timer sets MERGE_UPSTREAM at appropriate times.
-                    env.BRANCH_NAME =~ 'develop*' && params.MERGE_UPSTREAM
+                    env.BRANCH_NAME =~ 'develop' && params.MERGE_UPSTREAM
                 }
             }
             steps {
@@ -208,14 +212,14 @@ pipeline {
         stage('Upload new or changed recipes') {
             when {
                 allOf {
-                    expression { !skipBuilding }
+                    expression { !skipBuilding && upload_ok }
                     not { changeRequest() }
                 }
             }
             steps {
                 script {
                     def remote
-                    if (env.BRANCH_NAME =~ 'master*') {
+                    if (env.BRANCH_NAME =~ 'master') {
                         remote = 'conan-center-dl'
                     } else {
                         remote = 'conan-center-dl-staging'
@@ -354,8 +358,8 @@ pipeline {
                         steps {
                             script {
                                 def upload = ""
-                                if (env.CHANGE_ID == null) {  // i.e. not a pull request
-                                    if (env.BRANCH_NAME =~ 'master*') {
+                                if (env.CHANGE_ID == null && upload_ok) {  // i.e. not a pull request, and uploads are permitted
+                                    if (env.BRANCH_NAME =~ 'master') {
                                         upload = '--upload-to conan-center-dl'
                                     } else {
                                         upload = '--upload-to conan-center-dl-staging'
@@ -436,13 +440,13 @@ pipeline {
 
 void productionOrStaging() {
     if (env.CHANGE_ID == null) {
-        if (env.BRANCH_NAME =~ 'master*') {
+        if (env.BRANCH_NAME =~ 'master') {
             return 'production'
         } else {
             return 'staging'
         }
     } else {
-        if (env.CHANGE_BRANCH =~ 'master*') {
+        if (env.CHANGE_BRANCH =~ 'master') {
             return 'production'
         } else {
             return 'staging'
