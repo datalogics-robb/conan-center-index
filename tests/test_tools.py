@@ -1,3 +1,4 @@
+import collections.abc
 import json
 import os
 import platform
@@ -152,14 +153,23 @@ def conan_env(msys_bin):
 
 
 class TestBuildTools(object):
-    def search_local_package(self, ref, conan_env, tmp_path):
+    def search_local_packages(self, ref, conan_env, tmp_path):
         search_json = tmp_path / 'search.json'
         args = ['conan', 'search', f'{ref}@', '-j', str(search_json)]
         print(f'Getting package information for {ref}: {" ".join(args)}')
         subprocess.run(args, check=True, stderr=subprocess.STDOUT, env=conan_env)
         with open(search_json) as json_file:
             search_data = json.load(json_file)
-        return search_data
+        assert search_data['results'], 'there should have been results'
+        results = search_data['results']
+        assert results[0]['items'], 'there should have been an item in the results'
+        items = results[0]['items'][0]
+        # Note: checking for key, because it is ok for this function to return an empty package list.
+        # Using abstract base class to check that something is a mapping (it might not subclass
+        # dict): https://stackoverflow.com/a/1278070/11996393
+        assert isinstance(items, collections.abc.Mapping)
+        assert 'packages' in items, 'there should have been an package list in the first item'
+        return items['packages']
 
     def test_build_tool(self, prebuilt_tool, prebuilt_tool_config_name, prebuilt_tool_config, tool_recipe_folder,
                         upload_to, force_build, tmp_path, conan_env):
@@ -208,8 +218,11 @@ class TestBuildTools(object):
                 if package == 'msys2':
                     print(f'Not uploading {ref}, because it tends to modify itself during use.')
                     continue
-                search_data = self.search_local_package(ref, conan_env, tmp_path)
-                settings = search_data['results'][0]['items'][0]['packages'][0]['settings']
+                packages = self.search_local_packages(ref, conan_env, tmp_path)
+                if not packages:
+                    print(f'Not uploading {ref} because there are no local packages')
+                    continue
+                settings = packages[0].get('settings', {})
                 if platform.system() == 'Windows' and 'os' not in settings:
                     # Don't upload OS-universal packages from Windows; this avoids packaging
                     # script-based packages like autoconf without the proper mode bits
