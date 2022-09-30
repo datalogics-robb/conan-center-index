@@ -624,3 +624,26 @@ config:
         # Configs based on hostname.
         # These are applied last. Consider this for only the most extreme cases
         kamcentos6:
+merge_upstream:
+    # Overrides the defaults in the MergeUpstreamConfig class in tasks/merge_upstream.py
+    # Note the use of nested dataclasses; use nested dictionaries here.
+    pull_request:
+        reviewers: [ kam ]
+        assignee: kam
+    # Defaults:
+    #    cci:
+    #        url: git@github.com:conan-io/conan-center-index.git
+    #        branch: master
+    #    upstream:
+    #        host: octocat.dlogics.com
+    #        organization: datalogics
+    #        branch: develop
+    #        remote_name: merge-upstream-remote
+    #    pull_request:
+    #        host: octocat.dlogics.com
+    #        fork: <current username>
+    #        merge_branch_name: merge-from-conan-io
+    #        reviewers: [ ]
+    #        assignee: null
+    #        labels:
+    #            - from-conan-io

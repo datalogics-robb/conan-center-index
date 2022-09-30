@@ -11,6 +11,11 @@ def BUILD_TOOLS=[
     'sparcsolaris-conan-center-index': true,
     'windows-conan-center-index': true,
 ]
+def skipBuilding = false
+// Don't upload things if the job name has 'test' in it
+// Converting matcher to boolean with asBoolean() or find(): https://stackoverflow.com/a/35529715/11996393
+def upload_ok = ! (env.JOB_NAME =~ 'test').find()
+
 pipeline {
     parameters {
         choice(name: 'PLATFORM_FILTER',
@@ -24,12 +29,16 @@ pipeline {
                          'windows-conan-center-index'],
                description: 'Run on specific platform')
         booleanParam defaultValue: false, description: 'Completely clean the workspace before building, including the Conan cache', name: 'CLEAN_WORKSPACE'
+        string(name: 'PYTEST_OPTIONS', defaultValue: '',
+            description: 'Additional parameters for pytest, for instance, work on just swig with -k swig. See: https://docs.pytest.org/en/7.1.x/how-to/usage.html')
         booleanParam name: 'UPLOAD_ALL_RECIPES', defaultValue: false,
             description: 'Upload all recipes, instead of only recipes that changed since the last merge'
         booleanParam name: 'FORCE_TOOL_BUILD', defaultValue: false,
             description: 'Force build of all tools. By default, Conan will download the tool and test it if it\'s already built'
         booleanParam name: 'FORCE_TOOL_BUILD_WITH_REQUIREMENTS', defaultValue: false,
             description: 'Force build of all tools, and their requirements. By default, Conan will download the tool and test it if it\'s already built'
+        booleanParam name: 'MERGE_UPSTREAM', defaultValue: false,
+            description: 'If building develop branch, merge changes from upstream, i.e., conan-io/conan-center-index'
     }
     options{
         buildDiscarder logRotator(artifactDaysToKeepStr: '4', artifactNumToKeepStr: '10', daysToKeepStr: '7', numToKeepStr: '10')
@@ -40,6 +49,11 @@ pipeline {
             label 'noarch-conan-center-index'
             customWorkspace "workspace/${JOB_NAME.replaceAll('/','_')}_noarch/"
         }
+    }
+    triggers {
+        // From the doc: @midnight actually means some time between 12:00 AM and 2:59 AM.
+        // This gives us automatic spreading out of jobs, so they don't cause load spikes.
+        parameterizedCron(env.BRANCH_NAME =~ 'develop' ? '@midnight % MERGE_UPSTREAM=true' : '@midnight')
     }
     environment {
         CONAN_USER_HOME = "${WORKSPACE}"
@@ -54,6 +68,13 @@ pipeline {
         LIBPATH = "randomval"
         DL_CONAN_CENTER_INDEX = 'all'
         TOX_TESTENV_PASSENV = 'CONAN_USER_HOME CONAN_NON_INTERACTIVE CONAN_PRINT_RUN_COMMANDS CONAN_LOGIN_USERNAME CONAN_PASSWORD TRACKFILEACCESS MSBUILDDISABLENODEREUSE'
+        // Create a personal access token on the devauto account on Octocat with repo and read:org access, and use it to
+        // create a secret text credential with the name github-cli-devauto-octocat-access-token
+        // See: https://cli.github.com/manual/gh_auth_login
+        GH_ENTERPRISE_TOKEN = credentials('github-cli-devauto-octocat-access-token')
+        // When using the token above 'gh help environment' says to also set GH_HOST
+        // https://cli.github.com/manual/gh_help_environment
+        GH_HOST = 'octocat.dlogics.com'
     }
     stages {
         stage('Clean/reset Git checkout for release') {
@@ -166,16 +187,39 @@ pipeline {
                 }
             }
         }
+        stage('Merge from upstream') {
+            when {
+                expression {
+                    // Merge upstream on develop-prefixed branches if forced by parameter
+                    // The parametrized Cron timer sets MERGE_UPSTREAM at appropriate times.
+                    env.BRANCH_NAME =~ 'develop' && params.MERGE_UPSTREAM
+                }
+            }
+            steps {
+                script {
+                    sh  """
+                    . ${ENV_LOC['noarch']}/bin/activate
+                    invoke merge-upstream
+                    """
+                    def merge_upstream_status = readFile(file: '.merge-upstream-status')
+                    echo "merge-upstream status is ${merge_upstream_status}"
+                    // If the status of the upstream merge is MERGED, then don't do anything
+                    // else; Jenkins will notice the branch changed and re-run.
+                    skipBuilding = merge_upstream_status == 'MERGED'
+                }
+            }
+        }
         stage('Upload new or changed recipes') {
             when {
-                not {
-                    changeRequest()
+                allOf {
+                    expression { !skipBuilding && upload_ok }
+                    not { changeRequest() }
                 }
             }
             steps {
                 script {
                     def remote
-                    if (env.BRANCH_NAME =~ 'master*') {
+                    if (env.BRANCH_NAME =~ 'master') {
                         remote = 'conan-center-dl'
                     } else {
                         remote = 'conan-center-dl-staging'
@@ -206,8 +250,8 @@ pipeline {
                     }
                 }
                 when { anyOf {
-                    expression { params.PLATFORM_FILTER == 'all' }
-                    expression { params.PLATFORM_FILTER == env.NODE }
+                    expression { params.PLATFORM_FILTER == 'all' && !skipBuilding }
+                    expression { params.PLATFORM_FILTER == env.NODE && !skipBuilding }
                 } }
                 axes {
                     axis {
@@ -314,8 +358,8 @@ pipeline {
                         steps {
                             script {
                                 def upload = ""
-                                if (env.CHANGE_ID == null) {  // i.e. not a pull request
-                                    if (env.BRANCH_NAME =~ 'master*') {
+                                if (env.CHANGE_ID == null && upload_ok) {  // i.e. not a pull request, and uploads are permitted
+                                    if (env.BRANCH_NAME =~ 'master') {
                                         upload = '--upload-to conan-center-dl'
                                     } else {
                                         upload = '--upload-to conan-center-dl-staging'
@@ -330,7 +374,7 @@ pipeline {
                                 } else {
                                     force_build = ''
                                 }
-                                def pytest_command = "pytest -k build_tool ${force_build} ${upload} --junitxml=build-tools.xml --html=${short_node}-build-tools.html"
+                                def pytest_command = "pytest -k build_tool ${force_build} ${upload} --junitxml=build-tools.xml --html=${short_node}-build-tools.html ${params.PYTEST_OPTIONS}"
                                 if (isUnix()) {
                                     catchError(message: 'pytest had errors', stageResult: 'FAILURE') {
                                         script {
@@ -396,13 +440,13 @@ pipeline {
 
 void productionOrStaging() {
     if (env.CHANGE_ID == null) {
-        if (env.BRANCH_NAME =~ 'master*') {
+        if (env.BRANCH_NAME =~ 'master') {
             return 'production'
         } else {
             return 'staging'
         }
     } else {
-        if (env.CHANGE_BRANCH =~ 'master*') {
+        if (env.CHANGE_BRANCH =~ 'master') {
             return 'production'
         } else {
             return 'staging'

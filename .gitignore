@@ -453,3 +453,6 @@ requirements.txt
 /test-report.html
 
 /.mkenv
+
+# outputs from invoke tasks
+/.merge-upstream-status

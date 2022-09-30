@@ -1,13 +1,11 @@
 exclude: |
     (?x)^(
         .idea/.*|
-        .github/.*|
         assets/.*|
         docs/.*|
         linter/.*|
         recipes/.*|
-        CONTRIBUTING.md|
-        README.md
+        CONTRIBUTING.md
     )$
 default_stages: [commit, manual]
 repos:
@@ -20,6 +18,8 @@ repos:
             -   id: check-yaml
             -   id: check-added-large-files
             -   id: double-quote-string-fixer
+            -   id: check-docstring-first
+            -   id: debug-statements
     -   repo: https://gitlab.com/pycqa/flake8
         rev: 3.9.2
         hooks:
@@ -57,3 +57,20 @@ repos:
                     - mdformat-frontmatter
                     - mdformat-footnote
                     - mdformat-toc
+    # pylint has to be run from inside the virtual environment, so it has access to all
+    # the modules imported by a given Python modules.
+    # See: https://pylint.pycqa.org/en/latest/user_guide/installation/pre-commit-integration.html#pre-commit-integration
+    -   repo: local
+        hooks:
+            -   id: pylint
+                name: pylint
+                entry: pylint
+                language: system
+                types: [ python ]
+                # only tasks are linted at present
+                files: ^tasks/.*$
+                args:
+                  [
+                      "-rn", # only display messages
+                      "-sn", # don't display the score
+                  ]

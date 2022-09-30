@@ -9,8 +9,11 @@ tab_width = 4
 trim_trailing_whitespace = true
 indent_size = 4
 
-[*.py]
+[{docs,linter,recipes}/**.py]
 max_line_length = 200
+
+[*.py]
+max_line_length = 120
 
 [*.yml]
 tab_width = 2
@@ -26,3 +29,6 @@ indent_size = 8
 
 [*.{diff,patch,md}]
 trim_trailing_whitespace = false
+
+[*.md]
+max_line_length = 80
