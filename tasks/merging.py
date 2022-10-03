@@ -20,6 +20,7 @@ from invoke import Exit, Task, UnexpectedExit
 
 # Name of a status file
 MERGE_UPSTREAM_STATUS = '.merge-upstream-status'
+MERGE_STAGING_TO_PRODUCTION_STATUS = '.merge-staging-to-production-status'
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -204,16 +205,22 @@ def merge_staging_to_production(ctx):
     config = MergeStagingToProductionConfig.create_from_dlproject()
     logger.info('merge-staging-to-production configuration:\n%s', config.asyaml())
     with _preserving_branch_and_commit(ctx):
+        _remove_status_file(MERGE_STAGING_TO_PRODUCTION_STATUS)
         logger.info('Check out production branch...')
         ctx.run(f'git fetch {config.url} {config.production_branch}')
         ctx.run('git checkout --detach FETCH_HEAD')
 
         logger.info('Merge staging branch...')
         ctx.run(f'git fetch {config.url} {config.staging_branch}')
+        if _count_revs(ctx, 'HEAD..FETCH_HEAD') == 0:
+            logger.info('%s is up to date.', config.production_branch)
+            _write_status_file(MergeStatus.UP_TO_DATE, to_file=MERGE_STAGING_TO_PRODUCTION_STATUS)
+            return
         ctx.run(f'git merge --no-ff --no-edit --no-verify --into-name {config.production_branch} FETCH_HEAD')
 
         logger.info('Push merged production branch...')
         ctx.run(f'git push {config.url} HEAD:refs/heads/{config.production_branch}')
+        _write_status_file(MergeStatus.MERGED, to_file=MERGE_STAGING_TO_PRODUCTION_STATUS)
 
 
 def _remove_status_file(filename):
