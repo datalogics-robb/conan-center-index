@@ -647,3 +647,9 @@ merge_upstream:
     #        assignee: null
     #        labels:
     #            - from-conan-io
+merge_staging_to_production:
+    # Defaults:
+    #    host: octocat.dlogics.com
+    #    organization: datalogics
+    #    staging_branch: develop
+    #    production_branch: master

@@ -136,6 +136,7 @@ def upload_one_package_name(ctx, package_name, remote, upload=True):
 tasks = []
 tasks.extend([v for v in locals().values() if isinstance(v, Task)])
 tasks.append(merging.merge_upstream)
+tasks.append(merging.merge_staging_to_production)
 
 conan_tasks = Collection()
 conan_tasks.add_task(conan.install_config)

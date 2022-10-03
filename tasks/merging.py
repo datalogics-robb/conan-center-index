@@ -140,6 +140,26 @@ class MergeUpstreamConfig(Config):
 
 
 @dataclasses.dataclass
+class MergeStagingToProductionConfig(Config):
+    """Configuration describing parameters for production merges in the upstream repo. (usually Datalogics)"""
+    host: str = 'octocat.dlogics.com'
+    """Host for the Datalogics upstream"""
+    organization: str = 'datalogics'
+    """Name of the upstream organization"""
+    staging_branch: str = 'develop'
+    """Name of the staging branch"""
+    production_branch: str = 'master'
+    """Name of the production branch"""
+    yaml_key: typing.ClassVar[str] = 'merge_staging_to_production'
+    """Key for this configuration in dlproject.yaml."""
+
+    @property
+    def url(self) -> str:
+        """The URL for the upstream Git repository."""
+        return f'git@{self.host}:{self.organization}/conan-center-index.git'
+
+
+@dataclasses.dataclass
 class GitFileStatus:
     """A Git status"""
     status: str
@@ -176,6 +196,24 @@ def merge_upstream(ctx):
                 ctx.run('git merge --abort')
             _create_pull_request(ctx, config, pr_body)
             _write_status_file(MergeStatus.PULL_REQUEST)
+
+
+@Task
+def merge_staging_to_production(ctx):
+    """Merge the staging branch to the production branch"""
+    config = MergeStagingToProductionConfig.create_from_dlproject()
+    logger.info('merge-staging-to-production configuration:\n%s', config.asyaml())
+    with _preserving_branch_and_commit(ctx):
+        logger.info('Check out production branch...')
+        ctx.run(f'git fetch {config.url} {config.production_branch}')
+        ctx.run('git checkout --detach FETCH_HEAD')
+
+        logger.info('Merge staging branch...')
+        ctx.run(f'git fetch {config.url} {config.staging_branch}')
+        ctx.run(f'git merge --no-ff --no-edit --no-verify --into-name {config.production_branch} FETCH_HEAD')
+
+        logger.info('Push merged production branch...')
+        ctx.run(f'git push {config.url} HEAD:refs/heads/{config.production_branch}')
 
 
 def _remove_status_file():
