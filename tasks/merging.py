@@ -183,19 +183,19 @@ def merge_upstream(ctx):
     logger.info('merge-upstream configuration:\n%s', config.asyaml())
 
     # if anything fails past this point, the missing status file will also abort the Jenkins run.
-    _remove_status_file()
+    _remove_status_file(MERGE_UPSTREAM_STATUS)
     # Nested context handlers; see https://docs.python.org/3.10/reference/compound_stmts.html#the-with-statement
     with _preserving_branch_and_commit(ctx), _merge_remote(ctx, config):
         # Try to merge from CCI
         try:
-            _write_status_file(_merge_and_push(ctx, config))
+            _write_status_file(_merge_and_push(ctx, config), to_file=MERGE_UPSTREAM_STATUS)
         except MergeHadConflicts:
             try:
                 pr_body = _form_pr_body(ctx, config)
             finally:
                 ctx.run('git merge --abort')
             _create_pull_request(ctx, config, pr_body)
-            _write_status_file(MergeStatus.PULL_REQUEST)
+            _write_status_file(MergeStatus.PULL_REQUEST, to_file=MERGE_UPSTREAM_STATUS)
 
 
 @Task
@@ -216,18 +216,18 @@ def merge_staging_to_production(ctx):
         ctx.run(f'git push {config.url} HEAD:refs/heads/{config.production_branch}')
 
 
-def _remove_status_file():
+def _remove_status_file(filename):
     try:
-        os.remove(MERGE_UPSTREAM_STATUS)
+        os.remove(filename)
     except FileNotFoundError:
         pass
 
 
-def _write_status_file(merge_status):
+def _write_status_file(merge_status, to_file):
     """Write the merge status to the status file."""
-    logger.info('Write status %s to file %s', merge_status.name, MERGE_UPSTREAM_STATUS)
-    with open(MERGE_UPSTREAM_STATUS, 'w', encoding='utf-8') as merge_upstream_status:
-        merge_upstream_status.write(merge_status.name)
+    logger.info('Write status %s to file %s', merge_status.name, to_file)
+    with open(to_file, 'w', encoding='utf-8') as status:
+        status.write(merge_status.name)
 
 
 @contextlib.contextmanager
@@ -293,6 +293,13 @@ def _branch_exists(ctx, branch):
     logger.info('Check if %s exists...', branch)
     result = ctx.run(f'git rev-parse --quiet --verify {branch}', warn=True, hide='stdout')
     return result.ok
+
+
+def _count_revs(ctx, commit):
+    """Count the revisions in the given commit, which can be a range like branch..HEAD, or
+    other commit expression."""
+    count_revs_result = ctx.run(f'git rev-list {commit} --count', hide='stdout', pty=False)
+    return int(count_revs_result.stdout)
 
 
 def _merge_and_push(ctx, config):
@@ -368,10 +375,8 @@ def _retrieve_merge_conflicts(ctx):
 def _maybe_push(ctx, config):
     """Check to see if a push is necessary by counting the number of revisions
     that differ between current head and the push destination. Push if necessary"""
-    count_revs_result = ctx.run(
-        f'git rev-list {config.upstream.remote_name}/{config.upstream.branch}..HEAD --count',
-        hide='stdout', pty=False)
-    if int(count_revs_result.stdout) == 0:
+
+    if _count_revs(ctx, f'{config.upstream.remote_name}/{config.upstream.branch}..HEAD') == 0:
         logger.info('Repo is already up to date')
         return MergeStatus.UP_TO_DATE
     logger.info('Push to local repo...')
