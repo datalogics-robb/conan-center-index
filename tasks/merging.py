@@ -10,6 +10,7 @@ import shlex
 import shutil
 import tempfile
 import textwrap
+import typing
 from enum import Enum, auto
 from typing import Optional
 
@@ -88,38 +89,54 @@ class PullRequestConfig:
         return f'git@{self.host}:{self.fork}/conan-center-index.git'
 
 
+class Config:
+    """Base class for Config dataclasses that read from dlproject.yaml"""
+    yaml_key = None
+
+    class ConfigurationError(Exception):
+        """Configuration error when reading data."""
+
+    @classmethod
+    def _check_attributes(cls):
+        if cls.yaml_key is None:
+            raise NotImplementedError(f"Class {cls.__name__} must define 'yaml_key' as a 'ClassVar[str]' \n"
+                                      '    which indicates the key for the config in dlproject.yaml.')
+
+    @classmethod
+    def create_from_dlproject(cls):
+        """Create an instance of cls with defaults updated from dlproject.yaml"""
+        cls._check_attributes()
+        with open('dlproject.yaml', encoding='utf-8') as dlproject_file:
+            dlproject = yaml.safe_load(dlproject_file)
+        config_data = dlproject.get(cls.yaml_key, {})
+        try:
+            return dacite.from_dict(data_class=cls,
+                                    data=config_data,
+                                    config=dacite.Config(strict=True))
+        except dacite.DaciteError as exception:
+            raise cls.ConfigurationError(
+                f'Error reading {cls.yaml_key} from dlproject.yaml: {exception}') from exception
+
+    def asyaml(self):
+        """Return a string containing the yaml for this dataclass,
+        in canonical form."""
+        self._check_attributes()
+        # sort_keys=False to preserve the ordering that's in the dataclasses
+        # dict objects preserve order since Python 3.7
+        return yaml.dump(dataclasses.asdict(self), sort_keys=False, indent=4)
+
+
 @dataclasses.dataclass
-class MergeUpstreamConfig:
+class MergeUpstreamConfig(Config):
     """Configuration for the merge-upstream task."""
     cci: ConanCenterIndexConfig = dataclasses.field(default_factory=ConanCenterIndexConfig)
     """Configuration for Conan Center Index"""
     upstream: UpstreamConfig = dataclasses.field(default_factory=UpstreamConfig)
     """Configuration for the Datalogics upstream"""
     pull_request: PullRequestConfig = dataclasses.field(default_factory=PullRequestConfig)
-
-    class ConfigurationError(Exception):
-        """Configuration error when reading data."""
-
-    @classmethod
-    def create_from_dlproject(cls):
-        """Create a MergeUpstreamConfig with defaults updated from dlproject.yaml"""
-        with open('dlproject.yaml', encoding='utf-8') as dlproject_file:
-            dlproject = yaml.safe_load(dlproject_file)
-        config_data = dlproject.get('merge_upstream', {})
-        try:
-            return dacite.from_dict(data_class=MergeUpstreamConfig,
-                                    data=config_data,
-                                    config=dacite.Config(strict=True))
-        except dacite.DaciteError as exception:
-            raise cls.ConfigurationError(
-                f'Error reading merge_upstream from dlproject.yaml: {exception}') from exception
-
-    def asyaml(self):
-        """Return a string containing the yaml for this dataclass,
-        in canonical form."""
-        # sort_keys=False to preserve the ordering that's in the dataclasses
-        # dict objects preserve order since Python 3.7
-        return yaml.dump(dataclasses.asdict(self), sort_keys=False, indent=4)
+    """Configuration for the pull request"""
+    yaml_key: typing.ClassVar[str] = 'merge_upstream'
+    """Key for this configuration in dlproject.yaml."""
 
 
 @dataclasses.dataclass
