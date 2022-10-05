@@ -124,7 +124,7 @@ class Config:
         self._check_attributes()
         # sort_keys=False to preserve the ordering that's in the dataclasses
         # dict objects preserve order since Python 3.7
-        return yaml.dump(dataclasses.asdict(self), sort_keys=False, indent=4)
+        return yaml.dump({self.yaml_key: dataclasses.asdict(self)}, sort_keys=False, indent=4)
 
 
 @dataclasses.dataclass
