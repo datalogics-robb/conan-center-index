@@ -103,8 +103,8 @@ def msys_env(release_tool_config, tmpdir_factory, upload_to):
     if platform.system() == 'Windows':
         msys2_dir = tmpdir_factory.mktemp('msys2_install')
         install_json = msys2_dir / 'install.json'
-        args = ['conan', 'install', 'msys2/cci.latest@', '-if', msys2_dir, '-g', 'json', '--build', 'missing',
-                '-j', install_json]
+        args = ['conan', 'install', '--update', 'msys2/cci.latest@', '-if', msys2_dir, '-g', 'json',
+                '--build', 'missing', '-j', install_json]
         args.extend(release_tool_config.install_options())
         subprocess.run(args, check=True)
 
