@@ -39,6 +39,8 @@ pipeline {
             description: 'Force build of all tools, and their requirements. By default, Conan will download the tool and test it if it\'s already built'
         booleanParam name: 'MERGE_UPSTREAM', defaultValue: false,
             description: 'If building develop branch, merge changes from upstream, i.e., conan-io/conan-center-index'
+        booleanParam name: 'MERGE_STAGING_TO_PRODUCTION', defaultValue: false,
+            description: 'If building master branch, merge changes from the develop branch'
     }
     options{
         buildDiscarder logRotator(artifactDaysToKeepStr: '4', artifactNumToKeepStr: '10', daysToKeepStr: '7', numToKeepStr: '10')
@@ -206,6 +208,27 @@ pipeline {
                     // If the status of the upstream merge is MERGED, then don't do anything
                     // else; Jenkins will notice the branch changed and re-run.
                     skipBuilding = merge_upstream_status == 'MERGED'
+                }
+            }
+        }
+        stage('Merge staging to production') {
+            when {
+                expression {
+                    // Merge upstream on master-prefixed branches if forced by parameter
+                    env.BRANCH_NAME =~ 'master' && params.MERGE_STAGING_TO_PRODUCTION
+                }
+            }
+            steps {
+                script {
+                    sh  """
+                    . ${ENV_LOC['noarch']}/bin/activate
+                    invoke merge-staging-to-production
+                    """
+                    def merge_staging_to_production_status = readFile(file: '.merge-staging-to-production-status')
+                    echo "merge-staging-to-production status is ${merge_staging_to_production_status}"
+                    // If the status of the merge is MERGED, then don't do anything
+                    // else; Jenkins will notice the branch changed and re-run.
+                    skipBuilding = merge_staging_to_production_status == 'MERGED'
                 }
             }
         }

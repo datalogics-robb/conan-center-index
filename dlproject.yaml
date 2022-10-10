@@ -178,7 +178,7 @@ config:
                 build_folder: build-release
                 description: macOS Release
                 profile_host:
-                    - apple-clang-13.0-intel
+                    - build-profile-macos-intel
             DebugTool: &macOSDebugTool
                 include:
                     - ReleaseTool
@@ -230,7 +230,7 @@ config:
                 build_folder: build-release
                 description: macOS Release
                 profile_host:
-                    - apple-clang-13.0-arm
+                    - build-profile-macos-arm
             DebugTool:
                 include:
                     - ReleaseTool
@@ -292,7 +292,7 @@ config:
                 build_folder: build-release-tool
                 description: RedHat Release Tool
                 profile_host:
-                    - devtoolset-7
+                    - build-profile-linux-intel
             DebugTool: &redhatDebugTool
                 include: ReleaseTool
                 build_folder: build-debug-tool
@@ -350,22 +350,18 @@ config:
                 description: RedHat Debug
                 settings:
                     - build_type=Debug
-            ToolCommon:
-                env:
-                    # This is necessary to get SWIG to link on ARM; for some reason, it's not automatic
-                    - swig:LDFLAGS=-ldl
             ReleaseTool:
                 build_folder: build-release-tool
                 description: RedHat Release
-                include:
-                    - Release
-                    - ToolCommon
+                profile_host:
+                    - build-profile-linux-arm
             DebugTool:
                 build_folder: build-debug-tool
                 description: RedHat Debug
                 include:
-                    - Debug
-                    - ToolCommon
+                    - ReleaseTool
+                settings:
+                    - build_type=Debug
         prebuilt_tools:
             - cmake/[>=3.23.0]
             - doxygen/1.9.1
@@ -420,7 +416,7 @@ config:
             ReleaseTool:
                 build_folder: build-release-tool
                 description: Windows Release
-                profile_host: visual-studio-16
+                profile_host: build-profile-windows-intel
             DebugTool:
                 build_folder: build-debug-tool
                 description: Windows Debug Tool
@@ -493,12 +489,11 @@ config:
                 <<: *aixCommon
                 build_folder: build-release-tool
                 description: AIX Release
-                profile_host: aix-xlc16-ppc
+                profile_host: build-profile-aix-ppc
             ReleaseToolGCC:
                 build_folder: build-release-tool
                 description: AIX Release Tool with GCC
-                include:
-                    - Release
+                profile_host: build-profile-aix-ppc-gcc
             DebugTool:
                 build_folder: build-debug-tool
                 description: AIX Debug Tool
@@ -577,11 +572,7 @@ config:
             ReleaseTool:
                 build_folder: build-release-tool
                 description: Sparc Release Tool
-                include:
-                    - Release
-                env:
-                    # Override to not contain -std=c99, which breaks m4 by turning off the 'asm' keyword
-                    - CFLAGS=-pthread -m64
+                profile_host: build-profile-solaris-sparc
             DebugTool:
                 build_folder: build-debug-tool
                 description: Sparc Debug Tool
@@ -592,11 +583,7 @@ config:
             ReleaseTool32:
                 build_folder: build-release-tool-32
                 description: Sparc Release 32 Tool 32
-                include:
-                    - Release32
-                env:
-                    # Override to not contain -std=c99, which breaks m4 by turning off the 'asm' keyword
-                    - CFLAGS="-pthread -m32"
+                profile_host: build-profile-solaris-sparc-32
             DebugTool32:
                 build_folder: build-debug-tool-32
                 description: Sparc Debug 32 Tool
@@ -647,3 +634,9 @@ merge_upstream:
     #        assignee: null
     #        labels:
     #            - from-conan-io
+merge_staging_to_production:
+    # Defaults:
+    #    host: octocat.dlogics.com
+    #    organization: datalogics
+    #    staging_branch: develop
+    #    production_branch: master

@@ -10,6 +10,7 @@ import shlex
 import shutil
 import tempfile
 import textwrap
+import typing
 from enum import Enum, auto
 from typing import Optional
 
@@ -19,6 +20,7 @@ from invoke import Exit, Task, UnexpectedExit
 
 # Name of a status file
 MERGE_UPSTREAM_STATUS = '.merge-upstream-status'
+MERGE_STAGING_TO_PRODUCTION_STATUS = '.merge-staging-to-production-status'
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -88,38 +90,74 @@ class PullRequestConfig:
         return f'git@{self.host}:{self.fork}/conan-center-index.git'
 
 
+class Config:
+    """Base class for Config dataclasses that read from dlproject.yaml"""
+    yaml_key = None
+
+    class ConfigurationError(Exception):
+        """Configuration error when reading data."""
+
+    @classmethod
+    def _check_attributes(cls):
+        if cls.yaml_key is None:
+            raise NotImplementedError(f"Class {cls.__name__} must define 'yaml_key' as a 'ClassVar[str]' \n"
+                                      '    which indicates the key for the config in dlproject.yaml.')
+
+    @classmethod
+    def create_from_dlproject(cls):
+        """Create an instance of cls with defaults updated from dlproject.yaml"""
+        cls._check_attributes()
+        with open('dlproject.yaml', encoding='utf-8') as dlproject_file:
+            dlproject = yaml.safe_load(dlproject_file)
+        config_data = dlproject.get(cls.yaml_key, {})
+        try:
+            return dacite.from_dict(data_class=cls,
+                                    data=config_data,
+                                    config=dacite.Config(strict=True))
+        except dacite.DaciteError as exception:
+            raise cls.ConfigurationError(
+                f'Error reading {cls.yaml_key} from dlproject.yaml: {exception}') from exception
+
+    def asyaml(self):
+        """Return a string containing the yaml for this dataclass,
+        in canonical form."""
+        self._check_attributes()
+        # sort_keys=False to preserve the ordering that's in the dataclasses
+        # dict objects preserve order since Python 3.7
+        return yaml.dump({self.yaml_key: dataclasses.asdict(self)}, sort_keys=False, indent=4)
+
+
 @dataclasses.dataclass
-class MergeUpstreamConfig:
+class MergeUpstreamConfig(Config):
     """Configuration for the merge-upstream task."""
     cci: ConanCenterIndexConfig = dataclasses.field(default_factory=ConanCenterIndexConfig)
     """Configuration for Conan Center Index"""
     upstream: UpstreamConfig = dataclasses.field(default_factory=UpstreamConfig)
     """Configuration for the Datalogics upstream"""
     pull_request: PullRequestConfig = dataclasses.field(default_factory=PullRequestConfig)
+    """Configuration for the pull request"""
+    yaml_key: typing.ClassVar[str] = 'merge_upstream'
+    """Key for this configuration in dlproject.yaml."""
 
-    class ConfigurationError(Exception):
-        """Configuration error when reading data."""
 
-    @classmethod
-    def create_from_dlproject(cls):
-        """Create a MergeUpstreamConfig with defaults updated from dlproject.yaml"""
-        with open('dlproject.yaml', encoding='utf-8') as dlproject_file:
-            dlproject = yaml.safe_load(dlproject_file)
-        config_data = dlproject.get('merge_upstream', {})
-        try:
-            return dacite.from_dict(data_class=MergeUpstreamConfig,
-                                    data=config_data,
-                                    config=dacite.Config(strict=True))
-        except dacite.DaciteError as exception:
-            raise cls.ConfigurationError(
-                f'Error reading merge_upstream from dlproject.yaml: {exception}') from exception
+@dataclasses.dataclass
+class MergeStagingToProductionConfig(Config):
+    """Configuration describing parameters for production merges in the upstream repo. (usually Datalogics)"""
+    host: str = 'octocat.dlogics.com'
+    """Host for the Datalogics upstream"""
+    organization: str = 'datalogics'
+    """Name of the upstream organization"""
+    staging_branch: str = 'develop'
+    """Name of the staging branch"""
+    production_branch: str = 'master'
+    """Name of the production branch"""
+    yaml_key: typing.ClassVar[str] = 'merge_staging_to_production'
+    """Key for this configuration in dlproject.yaml."""
 
-    def asyaml(self):
-        """Return a string containing the yaml for this dataclass,
-        in canonical form."""
-        # sort_keys=False to preserve the ordering that's in the dataclasses
-        # dict objects preserve order since Python 3.7
-        return yaml.dump(dataclasses.asdict(self), sort_keys=False, indent=4)
+    @property
+    def url(self) -> str:
+        """The URL for the upstream Git repository."""
+        return f'git@{self.host}:{self.organization}/conan-center-index.git'
 
 
 @dataclasses.dataclass
@@ -146,33 +184,57 @@ def merge_upstream(ctx):
     logger.info('merge-upstream configuration:\n%s', config.asyaml())
 
     # if anything fails past this point, the missing status file will also abort the Jenkins run.
-    _remove_status_file()
+    _remove_status_file(MERGE_UPSTREAM_STATUS)
     # Nested context handlers; see https://docs.python.org/3.10/reference/compound_stmts.html#the-with-statement
     with _preserving_branch_and_commit(ctx), _merge_remote(ctx, config):
         # Try to merge from CCI
         try:
-            _write_status_file(_merge_and_push(ctx, config))
+            _write_status_file(_merge_and_push(ctx, config), to_file=MERGE_UPSTREAM_STATUS)
         except MergeHadConflicts:
             try:
                 pr_body = _form_pr_body(ctx, config)
             finally:
                 ctx.run('git merge --abort')
             _create_pull_request(ctx, config, pr_body)
-            _write_status_file(MergeStatus.PULL_REQUEST)
+            _write_status_file(MergeStatus.PULL_REQUEST, to_file=MERGE_UPSTREAM_STATUS)
 
 
-def _remove_status_file():
+@Task
+def merge_staging_to_production(ctx):
+    """Merge the staging branch to the production branch"""
+    config = MergeStagingToProductionConfig.create_from_dlproject()
+    logger.info('merge-staging-to-production configuration:\n%s', config.asyaml())
+    with _preserving_branch_and_commit(ctx):
+        _remove_status_file(MERGE_STAGING_TO_PRODUCTION_STATUS)
+        logger.info('Check out production branch...')
+        ctx.run(f'git fetch {config.url} {config.production_branch}')
+        ctx.run('git checkout --detach FETCH_HEAD')
+
+        logger.info('Merge staging branch...')
+        ctx.run(f'git fetch {config.url} {config.staging_branch}')
+        if _count_revs(ctx, 'HEAD..FETCH_HEAD') == 0:
+            logger.info('%s is up to date.', config.production_branch)
+            _write_status_file(MergeStatus.UP_TO_DATE, to_file=MERGE_STAGING_TO_PRODUCTION_STATUS)
+            return
+        ctx.run(f'git merge --no-ff --no-edit --no-verify --into-name {config.production_branch} FETCH_HEAD')
+
+        logger.info('Push merged production branch...')
+        ctx.run(f'git push {config.url} HEAD:refs/heads/{config.production_branch}')
+        _write_status_file(MergeStatus.MERGED, to_file=MERGE_STAGING_TO_PRODUCTION_STATUS)
+
+
+def _remove_status_file(filename):
     try:
-        os.remove(MERGE_UPSTREAM_STATUS)
+        os.remove(filename)
     except FileNotFoundError:
         pass
 
 
-def _write_status_file(merge_status):
+def _write_status_file(merge_status, to_file):
     """Write the merge status to the status file."""
-    logger.info('Write status %s to file %s', merge_status.name, MERGE_UPSTREAM_STATUS)
-    with open(MERGE_UPSTREAM_STATUS, 'w', encoding='utf-8') as merge_upstream_status:
-        merge_upstream_status.write(merge_status.name)
+    logger.info('Write status %s to file %s', merge_status.name, to_file)
+    with open(to_file, 'w', encoding='utf-8') as status:
+        status.write(merge_status.name)
 
 
 @contextlib.contextmanager
@@ -238,6 +300,13 @@ def _branch_exists(ctx, branch):
     logger.info('Check if %s exists...', branch)
     result = ctx.run(f'git rev-parse --quiet --verify {branch}', warn=True, hide='stdout')
     return result.ok
+
+
+def _count_revs(ctx, commit):
+    """Count the revisions in the given commit, which can be a range like branch..HEAD, or
+    other commit expression."""
+    count_revs_result = ctx.run(f'git rev-list {commit} --count', hide='stdout', pty=False)
+    return int(count_revs_result.stdout)
 
 
 def _merge_and_push(ctx, config):
@@ -313,10 +382,8 @@ def _retrieve_merge_conflicts(ctx):
 def _maybe_push(ctx, config):
     """Check to see if a push is necessary by counting the number of revisions
     that differ between current head and the push destination. Push if necessary"""
-    count_revs_result = ctx.run(
-        f'git rev-list {config.upstream.remote_name}/{config.upstream.branch}..HEAD --count',
-        hide='stdout', pty=False)
-    if int(count_revs_result.stdout) == 0:
+
+    if _count_revs(ctx, f'{config.upstream.remote_name}/{config.upstream.branch}..HEAD') == 0:
         logger.info('Repo is already up to date')
         return MergeStatus.UP_TO_DATE
     logger.info('Push to local repo...')
