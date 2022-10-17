@@ -29,6 +29,14 @@ logger.setLevel(logging.INFO)
 class MergeHadConflicts(Exception):
     """Thrown when the merge had conflicts. Usually handled by making a pull request."""
 
+    def __init__(self, conflicts=None):
+        """
+        Create the exception, with optional list of conflicts.
+
+        @param conflicts: a list of conflicts that were found
+        """
+        self.conflicts = conflicts
+
 
 class MergeStatus(Enum):
     """The status of the attempted merge. The name of this status will be placed into the
@@ -190,12 +198,12 @@ def merge_upstream(ctx):
         # Try to merge from CCI
         try:
             _write_status_file(_merge_and_push(ctx, config), to_file=MERGE_UPSTREAM_STATUS)
-        except MergeHadConflicts:
+        except MergeHadConflicts as merge_exception:
             try:
                 pr_body = _form_pr_body(ctx, config)
             finally:
                 ctx.run('git merge --abort')
-            _create_pull_request(ctx, config, pr_body)
+            _create_pull_request(ctx, config, pr_body, merge_exception.conflicts)
             _write_status_file(MergeStatus.PULL_REQUEST, to_file=MERGE_UPSTREAM_STATUS)
 
 
@@ -334,14 +342,15 @@ def _merge_and_push(ctx, config):
         warn=True)
     if merge_result.ok:
         return _maybe_push(ctx, config)
-    conflicts = _retrieve_merge_conflicts(ctx)
-    if not conflicts:
+    original_conflicts = _retrieve_merge_conflicts(ctx)
+    if not original_conflicts:
         # Something else went wrong with the merge
         raise UnexpectedExit(merge_result)
-    _remove_files_deleted_by_us(ctx, conflicts)
+    _remove_files_deleted_by_us(ctx, original_conflicts)
     conflicts = _retrieve_merge_conflicts(ctx)
     if conflicts:
-        raise MergeHadConflicts
+        # Note: Raising with the original conflicts, which include the delete/delete conflicts.
+        raise MergeHadConflicts(original_conflicts)
     logger.info('Commit merge with resolved conflicts...')
     # Finish the merge by committing. --no-verify is necessary to avoid running commit
     # hooks, which aren't run on merge commits that succeed.
@@ -427,15 +436,19 @@ def _form_pr_body(ctx, config):
     return body
 
 
-def _create_pull_request(ctx, config, pr_body):
+def _create_pull_request(ctx, config, pr_body, conflicts):
     """Create a pull request to merge in the data from upstream."""
     logger.info('Create pull request from upstream branch...')
     # Get the upstream ref
     ctx.run(f'git fetch {config.cci.url} {config.cci.branch}')
+    ctx.run('git checkout --detach FETCH_HEAD')
+    # Remove files that DL deleted, but were modified by conan-io
+    _remove_files_deleted_by_us(ctx, conflicts)
+    ctx.run('git commit --no-verify -m "Delete conflicting files that were deleted by DL"')
     # Push it to the fork the PR will be on. Have to include refs/heads in case the branch didn't
     # already exist
     ctx.run(f'git push --force {config.pull_request.url} '
-            f'FETCH_HEAD:refs/heads/{config.pull_request.merge_branch_name}')
+            f'HEAD:refs/heads/{config.pull_request.merge_branch_name}')
     with tempfile.NamedTemporaryFile(prefix='pr-body', mode='w+', encoding='utf-8') as pr_body_file:
         pr_body_file.write(pr_body)
         # Before passing the filename to gh pr create, flush it so all the data is on the disk
