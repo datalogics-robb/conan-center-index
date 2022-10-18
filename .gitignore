@@ -1,11 +1,14 @@
 # Conan specific
 test_package/build/
+test_package/test_output/
 conan.lock
 conanbuildinfo.txt
 conaninfo.txt
 graph_info.json
 build/
 
+# CMake
+CMakeUserPresets.json
 # Created by https://www.toptal.com/developers/gitignore/api/vim,git,linux,macos,emacs,python,windows,pycharm,visualstudiocode
 # Edit at https://www.toptal.com/developers/gitignore?templates=vim,git,linux,macos,emacs,python,windows,pycharm,visualstudiocode
 
