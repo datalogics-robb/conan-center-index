@@ -407,9 +407,11 @@ def _form_pr_body(ctx, config):
     logger.info('Create body of pull request message...')
     conflict_files_result = ctx.run('git diff --no-color --name-only --diff-filter=U', hide='stdout', pty=False)
     commits_on_upstream_result = ctx.run(
-        'git log --no-color --merge HEAD..MERGE_HEAD --pretty=format:"%h -%d %s (%cr) <%an>"', hide='stdout', pty=False)
+        'git log --no-color --no-merges --merge HEAD..MERGE_HEAD --pretty=format:"%h -%d %s (%cr) <%an>"',
+        hide='stdout', pty=False)
     commits_local_result = ctx.run(
-        'git log --no-color --merge MERGE_HEAD..HEAD --pretty=format:"%h -%d %s (%cr) <%an>"', hide='stdout', pty=False)
+        'git log --no-color --no-merges --merge MERGE_HEAD..HEAD --pretty=format:"%h -%d %s (%cr) <%an>"',
+        hide='stdout', pty=False)
     body = textwrap.dedent('''
         Merge changes from conan-io/conan-center-index into {local_branch}.
 
