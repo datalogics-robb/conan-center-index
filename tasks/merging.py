@@ -18,6 +18,9 @@ import dacite
 import yaml
 from invoke import Exit, Task, UnexpectedExit
 
+# Git config option to disable rerere, which tries to reuse merge conflict resolutions
+DISABLE_RERERE = '-c rerere.enabled=false '
+
 # Name of a status file
 MERGE_UPSTREAM_STATUS = '.merge-upstream-status'
 MERGE_STAGING_TO_PRODUCTION_STATUS = '.merge-staging-to-production-status'
@@ -226,7 +229,9 @@ def merge_staging_to_production(ctx):
             logger.info('%s is up to date.', config.production_branch)
             _write_status_file(MergeStatus.UP_TO_DATE, to_file=MERGE_STAGING_TO_PRODUCTION_STATUS)
             return
-        ctx.run(f'git merge --no-ff --no-edit --no-verify --into-name {config.production_branch} FETCH_HEAD')
+        ctx.run(
+            f'git {DISABLE_RERERE} merge --no-ff --no-edit --no-verify --into-name '
+            f'{config.production_branch} FETCH_HEAD')
 
         logger.info('Push merged production branch...')
         ctx.run(f'git push {config.url} HEAD:refs/heads/{config.production_branch}')
@@ -340,6 +345,7 @@ def _merge_and_push(ctx, config):
         # See the section "Merge Strategies" at the end of
         # https://www.git-scm.com/book/en/v2/Customizing-Git-Git-Attributes
         '-c merge.ours.driver=true '
+        f'{DISABLE_RERERE} '
         f'merge --no-ff --no-edit --no-verify --into-name {config.upstream.branch} FETCH_HEAD',
         warn=True)
     if merge_result.ok:
@@ -367,7 +373,7 @@ def _raise_exception_for_conflicted_merge(ctx):
     # Redo the merge to get all the conflicts, including the ones we resolve as 'ours'
     logger.info('Redoing merge to get complete conflict list')
     ctx.run('git merge --abort')
-    ctx.run('git -c merge.rerere=false merge --no-commit --no-ff FETCH_HEAD', warn=True)
+    ctx.run(f'git {DISABLE_RERERE} merge --no-commit --no-ff FETCH_HEAD', warn=True)
     conflicts = _retrieve_merge_conflicts(ctx)
     conflicts = _find_merge_attributes(ctx, conflicts)
     raise MergeHadConflicts(conflicts)
