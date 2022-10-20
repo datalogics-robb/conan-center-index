@@ -175,6 +175,8 @@ class GitFileStatus:
     """A Git short status string, see https://git-scm.com/docs/git-status#_short_format"""
     path: str
     """A file path, which may be two paths separated by -> if a rename or copy"""
+    merge_attr: str = 'unspecified'
+    """The merge attribute for this path from .gitattributes"""
 
 
 @Task
@@ -349,8 +351,9 @@ def _merge_and_push(ctx, config):
     _remove_files_deleted_by_us(ctx, original_conflicts)
     conflicts = _retrieve_merge_conflicts(ctx)
     if conflicts:
-        # Note: Raising with the original conflicts, which include the delete/delete conflicts.
-        raise MergeHadConflicts(original_conflicts)
+        # There are still unresolved conflicts. Raise an exception,
+        # and the top level PR will turn it into a pull request.
+        _raise_exception_for_conflicted_merge(ctx)
     logger.info('Commit merge with resolved conflicts...')
     # Finish the merge by committing. --no-verify is necessary to avoid running commit
     # hooks, which aren't run on merge commits that succeed.
@@ -358,13 +361,26 @@ def _merge_and_push(ctx, config):
     return _maybe_push(ctx, config)
 
 
+def _raise_exception_for_conflicted_merge(ctx):
+    """Redo the merge to get the complete list of conflicts, without the 'ours' merge
+    driver. Then, raise the MergeHadConflicts exception with the complete list."""
+    # Redo the merge to get all the conflicts, including the ones we resolve as 'ours'
+    logger.info('Redoing merge to get complete conflict list')
+    ctx.run('git merge --abort')
+    ctx.run('git -c merge.rerere=false merge --no-commit --no-ff FETCH_HEAD', warn=True)
+    conflicts = _retrieve_merge_conflicts(ctx)
+    conflicts = _find_merge_attributes(ctx, conflicts)
+    raise MergeHadConflicts(conflicts)
+
+
 def _remove_files_deleted_by_us(ctx, conflicts):
     """Examine conflicts for files deleted by us (status DU) and remove them with 'git rm'.
     This may clear enough of the conflicts to allow auto-merging to continue."""
     logger.info('Removing conflict files deleted by us...')
-    for conflict in conflicts:
-        if conflict.status == 'DU':  # we deleted, they modified (unmerged)
-            ctx.run(f'git rm {conflict.path}')
+    paths = [conflict.path for conflict in conflicts if conflict.status == 'DU']
+    for path in paths:
+        ctx.run(f'git rm {path}')
+    return paths
 
 
 def _retrieve_merge_conflicts(ctx):
@@ -398,6 +414,23 @@ def _maybe_push(ctx, config):
     logger.info('Push to local repo...')
     ctx.run(f'git push {config.upstream.remote_name} HEAD:refs/heads/{config.upstream.branch}')
     return MergeStatus.MERGED
+
+
+def _find_merge_attributes(ctx, conflicts):
+    """Find the merge attributes for the conflicts"""
+    modify_conflicts = [conflict.path for conflict in conflicts if conflict.status == 'UU']
+    check_attr = ctx.run(
+        f'git -c core.attributesFile=.gitattributes-merge check-attr merge -z -- {" ".join(modify_conflicts)}',
+        hide='stdout', pty=False)
+    # The -z means data fields separated by NUL
+    check_attr_data = check_attr.stdout.strip('\0').split('\0')
+    # Iterate in groups of three
+    # https://stackoverflow.com/a/18541496/11996393
+    check_attr_iters = [iter(check_attr_data)] * 3
+    path_attrs = {path: value for path, _, value in zip(*check_attr_iters)}
+    new_conflicts = [dataclasses.replace(conflict, merge_attr=path_attrs.get(conflict.path, 'unspecified'))
+                     for conflict in conflicts]
+    return new_conflicts
 
 
 def _form_pr_body(ctx, config):
@@ -473,9 +506,18 @@ def _create_pull_request(ctx, config, pr_body, conflicts):
     # Get the upstream ref
     ctx.run(f'git fetch {config.cci.url} {config.cci.branch}')
     ctx.run('git checkout --detach FETCH_HEAD')
+
     # Remove files that DL deleted, but were modified by conan-io
-    _remove_files_deleted_by_us(ctx, conflicts)
-    ctx.run('git commit --no-verify -m "Delete conflicting files that were deleted by DL"')
+    if _remove_files_deleted_by_us(ctx, conflicts):
+        ctx.run('git commit --no-verify -m "Delete conflicting files that were deleted by DL"')
+
+    # Resolve files in our favor if they have the attribute merge=ours
+    merge_ours = [conflict.path for conflict in conflicts if conflict.status == 'UU' and conflict.merge_attr == 'ours']
+    if merge_ours:
+        for path in merge_ours:
+            ctx.run(f'git checkout {config.upstream.remote_name}/{config.upstream.branch} -- {path}')
+        ctx.run('git commit --no-verify -m "Favor DL changes for files where merge=ours"')
+
     # Push it to the fork the PR will be on. Have to include refs/heads in case the branch didn't
     # already exist
     ctx.run(f'git push --force {config.pull_request.url} '
