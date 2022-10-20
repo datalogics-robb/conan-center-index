@@ -409,9 +409,15 @@ def _form_pr_body(ctx, config):
     commits_on_upstream_result = ctx.run(
         'git log --no-color --no-merges --merge HEAD..MERGE_HEAD --pretty=format:"%h -%d %s (%cr) <%an>"',
         hide='stdout', pty=False)
+    files = conflict_files_result.stdout.strip().replace('\n', ' ')
+    # Note: 'git diff HEAD...MERGE_HEAD' is a diff of changes on MERGE_HEAD that are not on HEAD.
+    # It's the same as: git diff $(git merge-base HEAD MERGE_HEAD) MERGE_HEAD
+    # See: https://git-scm.com/docs/git-diff for more details
+    diff_on_upstream_result = ctx.run(f'git diff -U HEAD...MERGE_HEAD -- {files}', hide='stdout', pty=False)
     commits_local_result = ctx.run(
         'git log --no-color --no-merges --merge MERGE_HEAD..HEAD --pretty=format:"%h -%d %s (%cr) <%an>"',
         hide='stdout', pty=False)
+    diff_on_local_result = ctx.run(f'git diff -U MERGE_HEAD...HEAD -- {files}', hide='stdout', pty=False)
     body = textwrap.dedent('''
         Merge changes from conan-io/conan-center-index into {local_branch}.
 
@@ -427,13 +433,36 @@ def _form_pr_body(ctx, config):
 
         {commits_on_upstream}
 
+        #### Differences on `conan-io`
+
+        <details><summary>Click to reveal...</summary>
+
+        ```diff
+        {diff_on_upstream}
+        ```
+
+        </details>
+
         ### Commits for conflict files, local
 
         {commits_local}
+
+        #### Differences, local
+
+        <details><summary>Click to reveal...</summary>
+
+        ```diff
+        {diff_on_local}
+        ```
+
+        </details>
+
     ''').format(local_branch=config.upstream.branch,
                 conflict_files=conflict_files_result.stdout,
                 commits_on_upstream=commits_on_upstream_result.stdout,
-                commits_local=commits_local_result.stdout)
+                diff_on_upstream=diff_on_upstream_result.stdout,
+                commits_local=commits_local_result.stdout,
+                diff_on_local=diff_on_local_result.stdout)
 
     return body
 
