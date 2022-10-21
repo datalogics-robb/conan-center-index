@@ -205,7 +205,7 @@ def merge_upstream(ctx):
             _write_status_file(_merge_and_push(ctx, config), to_file=MERGE_UPSTREAM_STATUS)
         except MergeHadConflicts as merge_exception:
             try:
-                pr_body = _form_pr_body(ctx, config)
+                pr_body = _form_pr_body(ctx, config, merge_exception.conflicts)
             finally:
                 ctx.run('git merge --abort')
             _create_pull_request(ctx, config, pr_body, merge_exception.conflicts)
@@ -439,24 +439,40 @@ def _find_merge_attributes(ctx, conflicts):
     return new_conflicts
 
 
-def _form_pr_body(ctx, config):
+def _unresolvable_conflicts(conflicts):
+    """Filter the conflict list, returning the ones that are unresolvable"""
+
+    def resolvable(conflict):
+        # DU conflicts (Datalogics deleted, conan-io modified) are resolvable
+        if conflict.status == 'DU':
+            return True
+        # merge=ours conflicts are resolvable
+        if conflict.status == 'UU' and conflict.merge_attr == 'ours':
+            return True
+        return False
+
+    return [conflict for conflict in conflicts if not resolvable(conflict)]
+
+
+def _form_pr_body(ctx, config, conflicts):
     """Create a body for the pull request summarizing information about the merge conflicts."""
     # Note: pty=False to enforce not using a PTY; that makes sure that Git doesn't
     # see a terminal and put escapes into the output we want to format.
     logger.info('Create body of pull request message...')
-    conflict_files_result = ctx.run('git diff --no-color --name-only --diff-filter=U', hide='stdout', pty=False)
+    files = [conflict.path for conflict in _unresolvable_conflicts(conflicts)]
+    files_arg = ' '.join(files)
     commits_on_upstream_result = ctx.run(
-        'git log --no-color --no-merges --merge HEAD..MERGE_HEAD --pretty=format:"%h - %s (%cr) <%an>"',
+        f'git log --no-color --no-merges --merge HEAD..MERGE_HEAD --pretty=format:"%h - %s (%cr) <%an>" -- {files_arg}',
         hide='stdout', pty=False)
-    files = conflict_files_result.stdout.strip().replace('\n', ' ')
+    # Get the paths of only the unresolvable conflicts
     # Note: 'git diff HEAD...MERGE_HEAD' is a diff of changes on MERGE_HEAD that are not on HEAD.
     # It's the same as: git diff $(git merge-base HEAD MERGE_HEAD) MERGE_HEAD
     # See: https://git-scm.com/docs/git-diff for more details
-    diff_on_upstream_result = ctx.run(f'git diff -U HEAD...MERGE_HEAD -- {files}', hide='stdout', pty=False)
+    diff_on_upstream_result = ctx.run(f'git diff -U HEAD...MERGE_HEAD -- {files_arg}', hide='stdout', pty=False)
     commits_local_result = ctx.run(
-        'git log --no-color --no-merges --merge MERGE_HEAD..HEAD --pretty=format:"%h - %s (%cr) <%an>"',
+        f'git log --no-color --no-merges --merge MERGE_HEAD..HEAD --pretty=format:"%h - %s (%cr) <%an>" -- {files_arg}',
         hide='stdout', pty=False)
-    diff_on_local_result = ctx.run(f'git diff -U MERGE_HEAD...HEAD -- {files}', hide='stdout', pty=False)
+    diff_on_local_result = ctx.run(f'git diff -U MERGE_HEAD...HEAD -- {files_arg}', hide='stdout', pty=False)
     body = textwrap.dedent('''
         Merge changes from conan-io/conan-center-index into {local_branch}.
 
@@ -497,7 +513,7 @@ def _form_pr_body(ctx, config):
         </details>
 
     ''').format(local_branch=config.upstream.branch,
-                conflict_files=conflict_files_result.stdout,
+                conflict_files='\n'.join(files),
                 commits_on_upstream=commits_on_upstream_result.stdout,
                 diff_on_upstream=diff_on_upstream_result.stdout,
                 commits_local=commits_local_result.stdout,
