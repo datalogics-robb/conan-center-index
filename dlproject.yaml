@@ -624,9 +624,6 @@ config:
             - package: doxygen/1.9.1
               options:
                   - doxygen:enable_search=False
-            - package: doxygen/1.9.2
-              options:
-                  - doxygen:enable_search=False
             - ninja/[~1.10.0]
             - ninja/[>=1.0.0]
             - b2/4.8.0
