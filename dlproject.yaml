@@ -191,7 +191,11 @@ config:
         prebuilt_tools:
             - cmake/[>=3.23.0]
             - doxygen/1.9.1
+            - doxygen/1.9.2
             - package: doxygen/1.9.1
+              options:
+                  - doxygen:enable_search=False
+            - package: doxygen/1.9.2
               options:
                   - doxygen:enable_search=False
             - ninja/[~1.10.0]
@@ -243,7 +247,11 @@ config:
         prebuilt_tools:
             - cmake/[>=3.23.0]
             - doxygen/1.9.1
+            - doxygen/1.9.2
             - package: doxygen/1.9.1
+              options:
+                  - doxygen:enable_search=False
+            - package: doxygen/1.9.2
               options:
                   - doxygen:enable_search=False
             - ninja/[~1.10.0]
@@ -314,7 +322,11 @@ config:
         prebuilt_tools: &redhat6Tools
             - package: cmake/[>=3.23.0]
             - package: doxygen/1.9.1
+            - package: doxygen/1.9.2
             - package: doxygen/1.9.1
+              options:
+                  - doxygen:enable_search=False
+            - package: doxygen/1.9.2
               options:
                   - doxygen:enable_search=False
             - package: ninja/[~1.10.0]
@@ -365,7 +377,11 @@ config:
         prebuilt_tools:
             - cmake/[>=3.23.0]
             - doxygen/1.9.1
+            - doxygen/1.9.2
             - package: doxygen/1.9.1
+              options:
+                  - doxygen:enable_search=False
+            - package: doxygen/1.9.2
               options:
                   - doxygen:enable_search=False
             - ninja/[~1.10.0]
@@ -445,7 +461,14 @@ config:
               configs:
                 # xapian-core doesn't work for cross-building x86_64 to x86
                 - ReleaseTool
+            - package: doxygen/1.9.2
+              configs:
+                # xapian-core doesn't work for cross-building x86_64 to x86
+                - ReleaseTool
             - package: doxygen/1.9.1
+              options:
+                  - doxygen:enable_search=False
+            - package: doxygen/1.9.2
               options:
                   - doxygen:enable_search=False
             - ninja/[~1.10.0]
@@ -516,6 +539,9 @@ config:
               configs:
                 - ReleaseTool
             - package: doxygen/1.9.1
+              options:
+                  - doxygen:enable_search=False
+            - package: doxygen/1.9.2
               options:
                   - doxygen:enable_search=False
             - package: ninja/[~1.10.0]
