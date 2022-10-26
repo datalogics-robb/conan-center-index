@@ -18,6 +18,9 @@ import dacite
 import yaml
 from invoke import Exit, Task, UnexpectedExit
 
+# Git config option to disable rerere, which tries to reuse merge conflict resolutions
+DISABLE_RERERE = '-c rerere.enabled=false '
+
 # Name of a status file
 MERGE_UPSTREAM_STATUS = '.merge-upstream-status'
 MERGE_STAGING_TO_PRODUCTION_STATUS = '.merge-staging-to-production-status'
@@ -28,6 +31,14 @@ logger.setLevel(logging.INFO)
 
 class MergeHadConflicts(Exception):
     """Thrown when the merge had conflicts. Usually handled by making a pull request."""
+
+    def __init__(self, conflicts=None):
+        """
+        Create the exception, with optional list of conflicts.
+
+        @param conflicts: a list of conflicts that were found
+        """
+        self.conflicts = conflicts
 
 
 class MergeStatus(Enum):
@@ -167,6 +178,8 @@ class GitFileStatus:
     """A Git short status string, see https://git-scm.com/docs/git-status#_short_format"""
     path: str
     """A file path, which may be two paths separated by -> if a rename or copy"""
+    merge_attr: str = 'unspecified'
+    """The merge attribute for this path from .gitattributes"""
 
 
 @Task
@@ -190,12 +203,12 @@ def merge_upstream(ctx):
         # Try to merge from CCI
         try:
             _write_status_file(_merge_and_push(ctx, config), to_file=MERGE_UPSTREAM_STATUS)
-        except MergeHadConflicts:
+        except MergeHadConflicts as merge_exception:
             try:
-                pr_body = _form_pr_body(ctx, config)
+                pr_body = _form_pr_body(ctx, config, merge_exception.conflicts)
             finally:
                 ctx.run('git merge --abort')
-            _create_pull_request(ctx, config, pr_body)
+            _create_pull_request(ctx, config, pr_body, merge_exception.conflicts)
             _write_status_file(MergeStatus.PULL_REQUEST, to_file=MERGE_UPSTREAM_STATUS)
 
 
@@ -216,7 +229,9 @@ def merge_staging_to_production(ctx):
             logger.info('%s is up to date.', config.production_branch)
             _write_status_file(MergeStatus.UP_TO_DATE, to_file=MERGE_STAGING_TO_PRODUCTION_STATUS)
             return
-        ctx.run(f'git merge --no-ff --no-edit --no-verify --into-name {config.production_branch} FETCH_HEAD')
+        ctx.run(
+            f'git {DISABLE_RERERE} merge --no-ff --no-edit --no-verify --into-name '
+            f'{config.production_branch} FETCH_HEAD')
 
         logger.info('Push merged production branch...')
         ctx.run(f'git push {config.url} HEAD:refs/heads/{config.production_branch}')
@@ -330,18 +345,21 @@ def _merge_and_push(ctx, config):
         # See the section "Merge Strategies" at the end of
         # https://www.git-scm.com/book/en/v2/Customizing-Git-Git-Attributes
         '-c merge.ours.driver=true '
+        f'{DISABLE_RERERE} '
         f'merge --no-ff --no-edit --no-verify --into-name {config.upstream.branch} FETCH_HEAD',
         warn=True)
     if merge_result.ok:
         return _maybe_push(ctx, config)
-    conflicts = _retrieve_merge_conflicts(ctx)
-    if not conflicts:
+    original_conflicts = _retrieve_merge_conflicts(ctx)
+    if not original_conflicts:
         # Something else went wrong with the merge
         raise UnexpectedExit(merge_result)
-    _remove_files_deleted_by_us(ctx, conflicts)
+    _remove_files_deleted_by_us(ctx, original_conflicts)
     conflicts = _retrieve_merge_conflicts(ctx)
     if conflicts:
-        raise MergeHadConflicts
+        # There are still unresolved conflicts. Raise an exception,
+        # and the top level PR will turn it into a pull request.
+        _raise_exception_for_conflicted_merge(ctx)
     logger.info('Commit merge with resolved conflicts...')
     # Finish the merge by committing. --no-verify is necessary to avoid running commit
     # hooks, which aren't run on merge commits that succeed.
@@ -349,13 +367,26 @@ def _merge_and_push(ctx, config):
     return _maybe_push(ctx, config)
 
 
+def _raise_exception_for_conflicted_merge(ctx):
+    """Redo the merge to get the complete list of conflicts, without the 'ours' merge
+    driver. Then, raise the MergeHadConflicts exception with the complete list."""
+    # Redo the merge to get all the conflicts, including the ones we resolve as 'ours'
+    logger.info('Redoing merge to get complete conflict list')
+    ctx.run('git merge --abort')
+    ctx.run(f'git {DISABLE_RERERE} merge --no-commit --no-ff FETCH_HEAD', warn=True)
+    conflicts = _retrieve_merge_conflicts(ctx)
+    conflicts = _find_merge_attributes(ctx, conflicts)
+    raise MergeHadConflicts(conflicts)
+
+
 def _remove_files_deleted_by_us(ctx, conflicts):
     """Examine conflicts for files deleted by us (status DU) and remove them with 'git rm'.
     This may clear enough of the conflicts to allow auto-merging to continue."""
     logger.info('Removing conflict files deleted by us...')
-    for conflict in conflicts:
-        if conflict.status == 'DU':  # we deleted, they modified (unmerged)
-            ctx.run(f'git rm {conflict.path}')
+    paths = [conflict.path for conflict in conflicts if conflict.status == 'DU']
+    for path in paths:
+        ctx.run(f'git rm {path}')
+    return paths
 
 
 def _retrieve_merge_conflicts(ctx):
@@ -391,16 +422,57 @@ def _maybe_push(ctx, config):
     return MergeStatus.MERGED
 
 
-def _form_pr_body(ctx, config):
+def _find_merge_attributes(ctx, conflicts):
+    """Find the merge attributes for the conflicts"""
+    modify_conflicts = [conflict.path for conflict in conflicts if conflict.status == 'UU']
+    check_attr = ctx.run(
+        f'git -c core.attributesFile=.gitattributes-merge check-attr merge -z -- {" ".join(modify_conflicts)}',
+        hide='stdout', pty=False)
+    # The -z means data fields separated by NUL
+    check_attr_data = check_attr.stdout.strip('\0').split('\0')
+    # Iterate in groups of three
+    # https://stackoverflow.com/a/18541496/11996393
+    check_attr_iters = [iter(check_attr_data)] * 3
+    path_attrs = {path: value for path, _, value in zip(*check_attr_iters)}
+    new_conflicts = [dataclasses.replace(conflict, merge_attr=path_attrs.get(conflict.path, 'unspecified'))
+                     for conflict in conflicts]
+    return new_conflicts
+
+
+def _unresolvable_conflicts(conflicts):
+    """Filter the conflict list, returning the ones that are unresolvable"""
+
+    def resolvable(conflict):
+        # DU conflicts (Datalogics deleted, conan-io modified) are resolvable
+        if conflict.status == 'DU':
+            return True
+        # merge=ours conflicts are resolvable
+        if conflict.status == 'UU' and conflict.merge_attr == 'ours':
+            return True
+        return False
+
+    return [conflict for conflict in conflicts if not resolvable(conflict)]
+
+
+def _form_pr_body(ctx, config, conflicts):
     """Create a body for the pull request summarizing information about the merge conflicts."""
     # Note: pty=False to enforce not using a PTY; that makes sure that Git doesn't
     # see a terminal and put escapes into the output we want to format.
     logger.info('Create body of pull request message...')
-    conflict_files_result = ctx.run('git diff --no-color --name-only --diff-filter=U', hide='stdout', pty=False)
+    files = [conflict.path for conflict in _unresolvable_conflicts(conflicts)]
+    files_arg = ' '.join(files)
     commits_on_upstream_result = ctx.run(
-        'git log --no-color --merge HEAD..MERGE_HEAD --pretty=format:"%h -%d %s (%cr) <%an>"', hide='stdout', pty=False)
+        f'git log --no-color --no-merges --merge HEAD..MERGE_HEAD --pretty=format:"%h - %s (%cr) <%an>" -- {files_arg}',
+        hide='stdout', pty=False)
+    # Get the paths of only the unresolvable conflicts
+    # Note: 'git diff HEAD...MERGE_HEAD' is a diff of changes on MERGE_HEAD that are not on HEAD.
+    # It's the same as: git diff $(git merge-base HEAD MERGE_HEAD) MERGE_HEAD
+    # See: https://git-scm.com/docs/git-diff for more details
+    diff_on_upstream_result = ctx.run(f'git diff -U HEAD...MERGE_HEAD -- {files_arg}', hide='stdout', pty=False)
     commits_local_result = ctx.run(
-        'git log --no-color --merge MERGE_HEAD..HEAD --pretty=format:"%h -%d %s (%cr) <%an>"', hide='stdout', pty=False)
+        f'git log --no-color --no-merges --merge MERGE_HEAD..HEAD --pretty=format:"%h - %s (%cr) <%an>" -- {files_arg}',
+        hide='stdout', pty=False)
+    diff_on_local_result = ctx.run(f'git diff -U MERGE_HEAD...HEAD -- {files_arg}', hide='stdout', pty=False)
     body = textwrap.dedent('''
         Merge changes from conan-io/conan-center-index into {local_branch}.
 
@@ -416,26 +488,62 @@ def _form_pr_body(ctx, config):
 
         {commits_on_upstream}
 
+        #### Differences on `conan-io`
+
+        <details><summary>Click to reveal...</summary>
+
+        ```diff
+        {diff_on_upstream}
+        ```
+
+        </details>
+
         ### Commits for conflict files, local
 
         {commits_local}
+
+        #### Differences, local
+
+        <details><summary>Click to reveal...</summary>
+
+        ```diff
+        {diff_on_local}
+        ```
+
+        </details>
+
     ''').format(local_branch=config.upstream.branch,
-                conflict_files=conflict_files_result.stdout,
+                conflict_files='\n'.join(files),
                 commits_on_upstream=commits_on_upstream_result.stdout,
-                commits_local=commits_local_result.stdout)
+                diff_on_upstream=diff_on_upstream_result.stdout,
+                commits_local=commits_local_result.stdout,
+                diff_on_local=diff_on_local_result.stdout)
 
     return body
 
 
-def _create_pull_request(ctx, config, pr_body):
+def _create_pull_request(ctx, config, pr_body, conflicts):
     """Create a pull request to merge in the data from upstream."""
     logger.info('Create pull request from upstream branch...')
     # Get the upstream ref
     ctx.run(f'git fetch {config.cci.url} {config.cci.branch}')
+    ctx.run('git checkout --detach FETCH_HEAD')
+
+    # Remove files that DL deleted, but were modified by conan-io
+    if _remove_files_deleted_by_us(ctx, conflicts):
+        ctx.run('git commit --no-verify -m "Delete conflicting files that were deleted by DL"')
+
+    # Resolve files in our favor if they have the attribute merge=ours
+    merge_ours = [conflict.path for conflict in conflicts if conflict.status == 'UU' and conflict.merge_attr == 'ours']
+    if merge_ours:
+        for path in merge_ours:
+            ctx.run(f'git checkout {config.upstream.remote_name}/{config.upstream.branch} -- {path}')
+        ctx.run('git commit --no-verify -m "Favor DL changes for files where merge=ours"')
+
     # Push it to the fork the PR will be on. Have to include refs/heads in case the branch didn't
     # already exist
     ctx.run(f'git push --force {config.pull_request.url} '
-            f'FETCH_HEAD:refs/heads/{config.pull_request.merge_branch_name}')
+            f'HEAD:refs/heads/{config.pull_request.merge_branch_name}')
     with tempfile.NamedTemporaryFile(prefix='pr-body', mode='w+', encoding='utf-8') as pr_body_file:
         pr_body_file.write(pr_body)
         # Before passing the filename to gh pr create, flush it so all the data is on the disk
