@@ -35,7 +35,7 @@ class CMakeConan(ConanFile):
 
     def requirements(self):
         if self.options.with_openssl:
-            self.requires("openssl/1.1.1q", private=True)
+            self.requires("openssl/1.1.1s", private=True)
 
     def validate(self):
         if self.settings.os == "Macos" and self.settings.arch == "x86":
