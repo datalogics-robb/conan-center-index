@@ -1,6 +1,6 @@
 # Conan specific
-test_package/build/
-test_package/test_output/
+**/test_package/build/
+**/test_package/test_output/
 conan.lock
 conanbuildinfo.txt
 conaninfo.txt
@@ -230,7 +230,7 @@ fabric.properties
 ### Python ###
 # Byte-compiled / optimized / DLL files
 __pycache__/
-test_package/__pycache__/
+**/test_package/__pycache__/
 *.pyc
 *.py[cod]
 *$py.class
