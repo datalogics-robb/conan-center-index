@@ -9,6 +9,17 @@ build/
 
 # CMake
 CMakeUserPresets.json
+
+# IDEs
+.idea
+.vs
+.vscode
+.project
+.pydevproject
+.settings/
+.ropeproject/
+.devcontainer/
+
 # Created by https://www.toptal.com/developers/gitignore/api/vim,git,linux,macos,emacs,python,windows,pycharm,visualstudiocode
 # Edit at https://www.toptal.com/developers/gitignore?templates=vim,git,linux,macos,emacs,python,windows,pycharm,visualstudiocode
 
@@ -450,6 +461,13 @@ requirements.txt
 
 # scons build files
 *.dblite
+
+# vim temp files
+.*.sw?
+.sw?
+Session.vim
+*~
+.undodir
 
 # Test outputs
 /test-report.xml
