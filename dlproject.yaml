@@ -202,8 +202,16 @@ config:
             - ninja/[>=1.0.0]
             - b2/4.8.0
             - b2/4.9.2
-            - swig/1.3.40+dl.1
-            - swig/4.0.2+dl.2
+            # Here, and afterward, building pcre without bzip2, because DLE
+            # sets that option in its conanfile.py. Currently, the only
+            # tool being built that uses bzip2 or pcre is SWIG.
+            # TODO: Should this be in the build-profile-* ?
+            - package: swig/1.3.40+dl.1
+              options:
+                  - pcre:with_bzip2=False
+            - package: swig/4.0.2+dl.2
+              options:
+                  - pcre:with_bzip2=False
         prebuilt_tools_configs:
             - ReleaseTool
 
@@ -258,8 +266,12 @@ config:
             - ninja/[>=1.0.0]
             - b2/4.8.0
             - b2/4.9.2
-            - swig/1.3.40+dl.1
-            - swig/4.0.2+dl.2
+            - package: swig/1.3.40+dl.1
+              options:
+                  - pcre:with_bzip2=False
+            - package: swig/4.0.2+dl.2
+              options:
+                  - pcre:with_bzip2=False
         prebuilt_tools_configs:
             - ReleaseTool
 
@@ -332,8 +344,12 @@ config:
             - package: ninja/[~1.10.0]
             - b2/4.8.0
             - b2/4.9.2
-            - swig/1.3.40+dl.1
-            - swig/4.0.2+dl.2
+            - package: swig/1.3.40+dl.1
+              options:
+                  - pcre:with_bzip2=False
+            - package: swig/4.0.2+dl.2
+              options:
+                  - pcre:with_bzip2=False
         prebuilt_tools_configs:
             # Build 64-bit tools on RHEL 6, because they're used for 64-bit DLE for APDFL 15
             - ReleaseTool
@@ -388,8 +404,12 @@ config:
             - ninja/[>=1.0.0]
             - b2/4.8.0
             - b2/4.9.2
-            - swig/1.3.40+dl.1
-            - swig/4.0.2+dl.2
+            - package: swig/1.3.40+dl.1
+              options:
+                  - pcre:with_bzip2=False
+            - package: swig/4.0.2+dl.2
+              options:
+                  - pcre:with_bzip2=False
         prebuilt_tools_configs:
             - ReleaseTool
 
@@ -475,8 +495,12 @@ config:
             - ninja/[>=1.0.0]
             - b2/4.8.0
             - b2/4.9.2
-            - swig/1.3.40+dl.1
-            - swig/4.0.2+dl.2
+            - package: swig/1.3.40+dl.1
+              options:
+                  - pcre:with_bzip2=False
+            - package: swig/4.0.2+dl.2
+              options:
+                  - pcre:with_bzip2=False
             - innoextract/1.9.0
         prebuilt_tools_configs:
             - ReleaseTool
@@ -557,9 +581,13 @@ config:
               configs:
                 - ReleaseToolGCC
             - package: swig/1.3.40+dl.1
+              options:
+                  - pcre:with_bzip2=False
               configs:
                 - ReleaseTool
             - package: swig/4.0.2+dl.2
+              options:
+                  - pcre:with_bzip2=False
               configs:
                 - ReleaseTool
         prebuilt_tools_configs:
@@ -628,8 +656,12 @@ config:
             - ninja/[>=1.0.0]
             - b2/4.8.0
             - b2/4.9.2
-            - swig/1.3.40+dl.1
-            - swig/4.0.2+dl.2
+            - package: swig/1.3.40+dl.1
+              options:
+                  - pcre:with_bzip2=False
+            - package: swig/4.0.2+dl.2
+              options:
+                  - pcre:with_bzip2=False
         prebuilt_tools_configs:
             - ReleaseTool
 
