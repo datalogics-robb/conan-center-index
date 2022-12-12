@@ -1,134 +1,216 @@
-from conans import ConanFile, AutoToolsBuildEnvironment, VisualStudioBuildEnvironment, tools
 import os
-import shutil
-import glob
 
-required_conan_version = ">=1.28.0"
+from conan import ConanFile
+from conan.tools.apple import is_apple_os
+from conan.tools.build import cross_building
+from conan.tools.env import VirtualBuildEnv, VirtualRunEnv, Environment
+from conan.tools.files import (
+    apply_conandata_patches,
+    copy,
+    export_conandata_patches,
+    get,
+    rename
+)
+from conan.tools.gnu import Autotools, AutotoolsDeps, AutotoolsToolchain
+from conan.tools.layout import basic_layout
+from conan.tools.microsoft import is_msvc, unix_path
+from conan.tools.scm import Version
+
+required_conan_version = ">=1.53.0"
+
 
 class GetTextConan(ConanFile):
     name = "libgettext"
     description = "An internationalization and localization system for multilingual programs"
-    topics = ("conan", "gettext", "intl", "libintl", "i18n")
+    topics = ("gettext", "intl", "libintl", "i18n")
     url = "https://github.com/conan-io/conan-center-index"
     homepage = "https://www.gnu.org/software/gettext"
     license = "GPL-3.0-or-later"
-    deprecated = "gettext"
+
     settings = "os", "arch", "compiler", "build_type"
-    exports_sources = ["patches/*.patch"]
-    options = {"shared": [True, False], "fPIC": [True, False], "threads": ["posix", "solaris", "pth", "windows", "disabled", "auto"]}
-    default_options = {"shared": False, "fPIC": True, "threads": "auto"}
+    options = {
+        "shared": [True, False],
+        "fPIC": [True, False],
+        "threads": ["posix", "solaris", "pth", "windows", "disabled", "auto"],
+    }
+    default_options = {
+        "shared": False,
+        "fPIC": True,
+        "threads": "auto",
+    }
 
     @property
-    def _source_subfolder(self):
-        return "source_subfolder"
-
-    @property
-    def _is_msvc(self):
-        return self.settings.compiler == "Visual Studio"
+    def _is_clang_cl(self):
+        return (str(self.settings.compiler) in ["clang"] and str(self.settings.os) in ["Windows"]) or \
+               self.settings.get_safe("compiler.toolset") == "ClangCL"
 
     @property
     def _gettext_folder(self):
         return "gettext-tools"
 
-    @property
-    def _make_args(self):
-        return ["-C", "intl"]
+    def export_sources(self):
+        export_conandata_patches(self)
 
     def config_options(self):
         if self.settings.os == 'Windows':
-            del self.options.fPIC
+            self.options.rm_safe("fPIC")
 
     def configure(self):
         if self.options.shared:
-            del self.options.fPIC
-        del self.settings.compiler.libcxx
-        del self.settings.compiler.cppstd
+            self.options.rm_safe("fPIC")
+        self.settings.rm_safe("compiler.libcxx")
+        self.settings.rm_safe("compiler.cppstd")
 
-        if(self.options.threads == "auto"):
-            self.options.threads = { "Solaris": "solaris", "Windows": "windows" }.get(str(self.settings.os), "posix")
+        if (self.options.threads == "auto"):
+            self.options.threads = {"Solaris": "solaris", "Windows": "windows"}.get(str(self.settings.os), "posix")
+
+    def layout(self):
+        basic_layout(self, src_folder="src")
 
     def requirements(self):
-        self.requires("libiconv/1.16")
+        self.requires("libiconv/1.17")
+
+    @property
+    def _settings_build(self):
+        return getattr(self, "settings_build", self.settings)
+
+    @property
+    def _user_info_build(self):
+        return getattr(self, "user_info_build", self.deps_user_info)
 
     def build_requirements(self):
-        if tools.os_info.is_windows:
-            if "CONAN_BASH_PATH" not in os.environ and \
-               tools.os_info.detect_windows_subsystem() != "msys2":
-                self.build_requires("msys2/20200517")
-        if self._is_msvc:
-            self.build_requires("automake/1.16.2")
+        if self._settings_build.os == "Windows":
+            self.win_bash = True
+            if not self.conf.get("tools.microsoft.bash:path", default=False, check_type=str):
+                self.tool_requires("msys2/cci.latest")
+        if is_msvc(self) or self._is_clang_cl:
+            self.tool_requires("automake/1.16.5")
 
     def source(self):
-        tools.get(**self.conan_data["sources"][self.version])
-        extracted_dir = "gettext-" + self.version
-        os.rename(extracted_dir, self._source_subfolder)
+        get(self, **self.conan_data["sources"][self.version], destination=self.source_folder, strip_root=True)
+
+    def generate(self):
+        VirtualBuildEnv(self).generate()
+
+        if not cross_building(self):
+            VirtualRunEnv(self).generate(scope="build")
+
+        tc = AutotoolsToolchain(self)
+        tc.configure_args += [
+            "HELP2MAN=/bin/true",
+            "EMACS=no",
+            "--disable-nls",
+            "--disable-dependency-tracking",
+            "--enable-relocatable",
+            "--disable-c++",
+            "--disable-java",
+            "--disable-csharp",
+            "--disable-libasprintf",
+            "--disable-curses",
+            "--disable-threads" if self.options.threads == "disabled" else ("--enable-threads=" + str(self.options.threads)),
+            f"--with-libiconv-prefix={unix_path(self, self.deps_cpp_info['libiconv'].rootpath)}"
+        ]
+        if is_msvc(self) or self._is_clang_cl:
+            target = None
+            if self.settings.arch == "x86_64":
+                target = "x86_64-w64-mingw32"
+            elif self.settings.arch == "x86":
+                target = "i686-w64-mingw32"
+
+            if target is not None:
+                tc.configure_args += [f"--host={target}", f"--build={target}"]
+
+            if (self.settings.compiler == "Visual Studio" and Version(self.settings.compiler.version) >= "12") or \
+               (self.settings.compiler == "msvc" and Version(self.settings.compiler.version) >= "180"):
+                tc.extra_cflags += ["-FS"]
+
+        tc.make_args += ["-C", "intl"]
+        tc.generate()
+
+        deps = AutotoolsDeps(self)
+
+        if is_msvc(self) or self._is_clang_cl:
+            # This mimics the v1 recipe, on the basis that it works and the defaults do not.
+            def lib_paths():
+                for dep in self.deps_cpp_info.deps:
+                    dep_info = self.deps_cpp_info[dep]
+                    for lib_path in dep_info.lib_paths:
+                        yield unix_path(self, lib_path)
+
+            fixed_cppflags_args = deps.vars().get("CPPFLAGS").replace("/I", "-I")
+            deps.environment.define("CPPFLAGS", f"$CPPFLAGS {fixed_cppflags_args}")
+            if self._is_clang_cl:
+                fixed_ldflags_args = deps.vars().get("LDFLAGS").replace("/LIBPATH:", "-LIBPATH:")
+            else:
+                fixed_ldflags_args = deps.vars().get("LDFLAGS").replace("/LIBPATH:", "-L")
+            deps.environment.define("LDFLAGS", f"$LDFLAGS {fixed_ldflags_args}")
+
+            libs = deps.vars().get("LIBS")
+            deps.environment.define("_LINK_", libs)
+            deps.environment.unset("LIBS")
+
+            for lib_path in lib_paths():
+                deps.environment.prepend_path("LIB", lib_path)
+
+        deps.generate()
+
+        if is_msvc(self) or self._is_clang_cl:
+            def programs():
+                rc = None
+                if self.settings.arch == "x86_64":
+                    rc = "windres --target=pe-x86-64"
+                elif self.settings.arch == "x86":
+                    rc = "windres --target=pe-i386"
+                if self._is_clang_cl:
+                    return os.environ.get("CC", "clang-cl"), os.environ.get("AR", "llvm-lib"), os.environ.get("LD", "lld-link"), rc
+                if is_msvc(self):
+                    return "cl -nologo", "lib", "link", rc
+                    
+            env = Environment()
+            compile_wrapper = unix_path(self, self._user_info_build["automake"].compile)
+            ar_wrapper = unix_path(self, self._user_info_build["automake"].ar_lib)
+            cc, ar, link, rc = programs()
+            env.define("CC", f"{compile_wrapper} {cc}")
+            env.define("CXX", f"{compile_wrapper} {cc}")
+            env.define("LD", link)
+            env.define("AR", f"{ar_wrapper} {ar}")
+            env.define("NM", "dumpbin -symbols")
+            env.define("RANLIB", ":")
+            env.define("STRIP", ":")
+            if rc is not None:
+                env.define("RC", rc)
+                env.define("WINDRES", rc)
+
+            env.vars(self).save_script("conanbuild_msvc")
 
     def build(self):
-        for patch in self.conan_data["patches"][self.version]:
-            tools.patch(**patch)
-        libiconv_prefix = self.deps_cpp_info["libiconv"].rootpath
-        libiconv_prefix = tools.unix_path(libiconv_prefix) if tools.os_info.is_windows else libiconv_prefix
-        args = ["HELP2MAN=/bin/true",
-                "EMACS=no",
-                "--disable-nls",
-                "--disable-dependency-tracking",
-                "--enable-relocatable",
-                "--disable-c++",
-                "--disable-java",
-                "--disable-csharp",
-                "--disable-libasprintf",
-                "--disable-curses",
-                "--disable-threads" if self.options.threads == "disabled" else ("--enable-threads=" + str(self.options.threads)),
-                "--with-libiconv-prefix=%s" % libiconv_prefix]
-        build = None
-        host = None
-        rc = None
-        if self.options.shared:
-            args.extend(["--disable-static", "--enable-shared"])
-        else:
-            args.extend(["--disable-shared", "--enable-static"])
-        if self._is_msvc:
-            # INSTALL.windows: Native binaries, built using the MS Visual C/C++ tool chain.
-            build = False
-            if self.settings.arch == "x86":
-                host = "i686-w64-mingw32"
-                rc = "windres --target=pe-i386"
-            elif self.settings.arch == "x86_64":
-                host = "x86_64-w64-mingw32"
-                rc = "windres --target=pe-x86-64"
-            automake_perldir = tools.unix_path(os.path.join(self.deps_cpp_info['automake'].rootpath, "bin", "share", "automake-1.16"))
-            args.extend(["CC=%s/compile cl -nologo" % automake_perldir,
-                         "LD=link",
-                         "NM=dumpbin -symbols",
-                         "STRIP=:",
-                         "AR=%s/ar-lib lib" % automake_perldir,
-                         "RANLIB=:"])
-            if rc:
-                args.extend(['RC=%s' % rc, 'WINDRES=%s' % rc])
-        with tools.vcvars(self.settings) if self._is_msvc else tools.no_op():
-            with tools.environment_append(VisualStudioBuildEnvironment(self).vars) if self._is_msvc else tools.no_op():
-                with tools.chdir(os.path.join(self._source_subfolder, self._gettext_folder)):
-                    env_build = AutoToolsBuildEnvironment(self, win_bash=tools.os_info.is_windows)
-                    if self._is_msvc:
-                        env_build.flags.append("-FS")
-                    env_build.configure(args=args, build=build, host=host)
-                    env_build.make(self._make_args)
+        apply_conandata_patches(self)
+        autotools = Autotools(self)
+        autotools.configure("gettext-tools")
+        autotools.make()
 
     def package(self):
-        self.copy(pattern="COPYING", dst="licenses", src=self._source_subfolder)
-        self.copy(pattern="*.dll", dst="bin", src=self._source_subfolder, keep_path=False, symlinks=True)
-        self.copy(pattern="*.lib", dst="lib", src=self._source_subfolder, keep_path=False, symlinks=True)
-        self.copy(pattern="*.a", dst="lib", src=self._source_subfolder, keep_path=False, symlinks=True)
-        self.copy(pattern="*.so*", dst="lib", src=self._source_subfolder, keep_path=False, symlinks=True)
-        self.copy(pattern="*.dylib*", dst="lib", src=self._source_subfolder, keep_path=False, symlinks=True)
-        self.copy(pattern="*libgnuintl.h", dst="include", src=self._source_subfolder, keep_path=False, symlinks=True)
-        os.rename(os.path.join(self.package_folder, "include", "libgnuintl.h"),
-                  os.path.join(self.package_folder, "include", "libintl.h"))
-        if self._is_msvc and self.options.shared:
-            os.rename(os.path.join(self.package_folder, "lib", "gnuintl.dll.lib"),
-                      os.path.join(self.package_folder, "lib", "gnuintl.lib"))
+        dest_lib_dir = os.path.join(self.package_folder, "lib")
+        dest_runtime_dir = os.path.join(self.package_folder, "bin")
+        dest_include_dir = os.path.join(self.package_folder, "include")
+        copy(self, "COPYING", self.source_folder, os.path.join(self.package_folder, "licenses"))
+        copy(self, "*gnuintl*.dll", self.build_folder, dest_runtime_dir, keep_path=False)
+        copy(self, "*gnuintl*.lib", self.build_folder, dest_lib_dir, keep_path=False)
+        copy(self, "*gnuintl*.a", self.build_folder, dest_lib_dir, keep_path=False)
+        copy(self, "*gnuintl*.so*", self.build_folder, dest_lib_dir, keep_path=False)
+        copy(self, "*gnuintl*.dylib", self.build_folder, dest_lib_dir, keep_path=False)
+        copy(self, "*libgnuintl.h", self.build_folder, dest_include_dir, keep_path=False)
+        rename(self, os.path.join(dest_include_dir, "libgnuintl.h"), os.path.join(dest_include_dir, "libintl.h"))
+        if (is_msvc(self) or self._is_clang_cl) and self.options.shared:
+            rename(self, os.path.join(dest_lib_dir, "gnuintl.dll.lib"), os.path.join(dest_lib_dir, "gnuintl.lib"))
 
     def package_info(self):
+        self.cpp_info.set_property("cmake_find_mode", "both")
+        self.cpp_info.set_property("cmake_file_name", "Intl")
+        self.cpp_info.set_property("cmake_target_name", "Intl::Intl")
         self.cpp_info.libs = ["gnuintl"]
-        if self.settings.os == "Macos":
-            self.cpp_info.frameworks.extend(['CoreFoundation'])
+        if is_apple_os(self):
+            self.cpp_info.frameworks.append("CoreFoundation")
+
+        self.cpp_info.names["cmake_find_package"] = "Intl"
+        self.cpp_info.names["cmake_find_package_multi"] = "Intl"

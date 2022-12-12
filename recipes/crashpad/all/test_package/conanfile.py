@@ -12,7 +12,7 @@ class TestPackageConan(ConanFile):
         cmake.build()
 
     def test(self):
-        if not tools.cross_building(self.settings):
+        if not tools.cross_building(self):
             test_env_dir = "test_env"
             tools.mkdir(test_env_dir)
             bin_path = os.path.join("bin", "test_package")
@@ -20,6 +20,6 @@ class TestPackageConan(ConanFile):
             handler_bin_path = os.path.join(self.deps_cpp_info["crashpad"].rootpath, "bin", handler_exe)
             self.run("%s %s/db %s" % (bin_path, test_env_dir, handler_bin_path), run_environment=True)
             if self.settings.os == "Windows":
-                handler_exe = "crashpad_handler_com.com"
+                handler_exe = "crashpad_handler.com"
                 handler_bin_path = os.path.join(self.deps_cpp_info["crashpad"].rootpath, "bin", handler_exe)
                 self.run("%s %s/db %s" % (bin_path, test_env_dir, handler_bin_path), run_environment=True)

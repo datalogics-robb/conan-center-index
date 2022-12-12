@@ -1,5 +1,6 @@
 from conans import ConanFile, tools
 from conans.errors import ConanInvalidConfiguration
+from conans.tools import Version
 import os, glob
 
 
@@ -10,29 +11,45 @@ class ZuluOpenJDK(ConanFile):
     homepage = "https://www.azul.com"
     license = "https://www.azul.com/products/zulu-and-zulu-enterprise/zulu-terms-of-use/"
     topics = ("java", "jdk", "openjdk")
-    settings = "os", "arch"
+    settings = "os", "arch", "build_type", "compiler"
 
     @property
     def _source_subfolder(self):
         return "source_subfolder"
 
     @property
+    def _settings_build(self):
+        return getattr(self, "settings_build", self.settings)
+
+    @property
     def _jni_folder(self):
-        folder = {"Linux": "linux", "Macos": "darwin", "Windows": "win32"}.get(str(self.settings.os))
+        folder = {"Linux": "linux", "Macos": "darwin", "Windows": "win32"}.get(str(self._settings_build.os))
         return os.path.join("include", folder)
 
-    def configure(self):
-        if self.settings.arch != "x86_64":
-            raise ConanInvalidConfiguration("Unsupported Architecture.  This package currently only supports x86_64.")
-        if self.settings.os not in ["Windows", "Macos", "Linux"]:
-            raise ConanInvalidConfiguration("Unsupported os. This package currently only support Linux/Macos/Windows")
+    def package_id(self):
+        del self.info.settings.build_type
+        del self.info.settings.compiler
 
-    def source(self):
-        tools.get(**self.conan_data["sources"][self.version][str(self.settings.os)],
-                  destination=self._source_subfolder, strip_root=True)
+    def validate(self):
+        if Version(self.version) < Version("11.0.12"):
+            supported_archs = ["x86_64"]
+            if self._settings_build.arch not in supported_archs:
+                raise ConanInvalidConfiguration(f"Unsupported Architecture ({self._settings_build.arch}). The version {self.version} currently only supports {supported_archs}.")
+        elif Version(self.version) >= Version("11.0.12"):
+            supported_archs = ["x86_64", "armv8"]
+            if self._settings_build.arch not in supported_archs:
+                raise ConanInvalidConfiguration(f"Unsupported Architecture ({self._settings_build.arch}). This version {self.version} currently only supports {supported_archs}.")
+        supported_os = ["Windows", "Macos", "Linux"]
+        if self._settings_build.os not in supported_os:
+            raise ConanInvalidConfiguration(f"Unsupported os ({self._settings_build.os}). This package currently only support {supported_os}.")
 
     def build(self):
-        pass # nothing to do, but this shall trigger no warnings ;-)
+        if Version(self.version) < Version("11.0.12"):
+            tools.get(**self.conan_data["sources"][self.version][str(self._settings_build.os)],
+                    destination=self._source_subfolder, strip_root=True)
+        else:
+            tools.get(**self.conan_data["sources"][self.version][str(self._settings_build.os)][str(self._settings_build.arch)],
+                    destination=self._source_subfolder, strip_root=True)
 
     def package(self):
         self.copy(pattern="*", dst="bin", src=os.path.join(self._source_subfolder, "bin"), excludes=("msvcp140.dll", "vcruntime140.dll"))

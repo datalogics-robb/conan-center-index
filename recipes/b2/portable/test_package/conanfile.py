@@ -1,12 +1,13 @@
-from conans import ConanFile, tools
-import os
+from conan import ConanFile
 
 
-class TestPackgeConan(ConanFile):
-    settings = "os", "arch"
+class TestPackageConan(ConanFile):
+    settings = "os", "arch", "compiler", "build_type"
+    generators = "VirtualBuildEnv"
+    test_type = "explicit"
+
+    def build_requirements(self):
+        self.tool_requires(self.tested_reference_str)
 
     def test(self):
-        tools.save(
-            "jamroot.jam",
-            'ECHO "info:" Success loading project jamroot.jam file. ;')
-        self.run("b2 --debug-configuration", run_environment=True)
+        self.run("b2 -v")

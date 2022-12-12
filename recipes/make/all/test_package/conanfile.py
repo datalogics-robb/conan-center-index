@@ -1,11 +1,14 @@
-from conans import ConanFile, AutoToolsBuildEnvironment, tools
-import os
+from conan import ConanFile
 
 
 class TestPackageConan(ConanFile):
-    settings = "os", "compiler", "build_type", "arch"
+    settings = "os", "arch", "compiler", "build_type"
+    generators = "VirtualBuildEnv"
+    test_type = "explicit"
+
+    def build_requirements(self):
+        self.tool_requires(self.tested_reference_str)
 
     def test(self):
-        with tools.chdir(self.source_folder), tools.remove_from_path("make"):
-            env_build = AutoToolsBuildEnvironment(self)
-            env_build.make(args=["love"])
+        make = self.conf.get("tools.gnu:make_program", check_type=str)
+        self.run(f"{make} -C {self.source_folder} love")

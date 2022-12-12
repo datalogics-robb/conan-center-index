@@ -1,22 +1,41 @@
-from conans import ConanFile, AutoToolsBuildEnvironment, VisualStudioBuildEnvironment, tools
+from conan import ConanFile
+from conan.tools.env import Environment, VirtualBuildEnv
+from conan.tools.files import apply_conandata_patches, chdir, copy, export_conandata_patches, get, rm, rmdir
+from conan.tools.gnu import Autotools, AutotoolsToolchain
+from conan.tools.layout import basic_layout
+from conan.tools.microsoft import is_msvc, unix_path, VCVars
 import os
+
+required_conan_version = ">=1.53.0"
 
 
 class LibdeflateConan(ConanFile):
     name = "libdeflate"
     description = "Heavily optimized library for DEFLATE/zlib/gzip compression and decompression."
     license = "MIT"
-    topics = ("conan", "libdeflate", "compression", "decompression", "deflate", "zlib", "gzip")
-    homepage = "https://github.com/ebiggers/libdeflate"
     url = "https://github.com/conan-io/conan-center-index"
-
+    homepage = "https://github.com/ebiggers/libdeflate"
+    topics = ("compression", "decompression", "deflate", "zlib", "gzip")
     settings = "os", "arch", "compiler", "build_type"
-    options = {"shared": [True, False], "fPIC": [True, False]}
-    default_options = {"shared": False, "fPIC": True}
+    options = {
+        "shared": [True, False],
+        "fPIC": [True, False],
+    }
+    default_options = {
+        "shared": False,
+        "fPIC": True,
+    }
 
     @property
-    def _source_subfolder(self):
-        return "source_subfolder"
+    def _is_clangcl(self):
+        return self.settings.compiler == "clang" and self.settings.os == "Windows"
+
+    @property
+    def _settings_build(self):
+        return getattr(self, "settings_build", self.settings)
+
+    def export_sources(self):
+        export_conandata_patches(self)
 
     def config_options(self):
         if self.settings.os == "Windows":
@@ -24,64 +43,85 @@ class LibdeflateConan(ConanFile):
 
     def configure(self):
         if self.options.shared:
-            del self.options.fPIC
-        del self.settings.compiler.libcxx
-        del self.settings.compiler.cppstd
+            self.options.rm_safe("fPIC")
+        self.settings.rm_safe("compiler.cppstd")
+        self.settings.rm_safe("compiler.libcxx")
+
+    def layout(self):
+        basic_layout(self, src_folder="src")
 
     def build_requirements(self):
-        if tools.os_info.is_windows and self.settings.compiler != "Visual Studio" and \
-           not tools.get_env("CONAN_BASH_PATH"):
-            self.build_requires("msys2/20200517")
+        if self._settings_build.os == "Windows" and not (is_msvc(self) or self._is_clangcl):
+            self.win_bash = True
+            if not self.conf.get("tools.microsoft.bash:path", check_type=str):
+                self.tool_requires("msys2/cci.latest")
 
     def source(self):
-        tools.get(**self.conan_data["sources"][self.version])
-        os.rename(self.name + "-" + self.version, self._source_subfolder)
+        get(self, **self.conan_data["sources"][self.version], destination=self.source_folder, strip_root=True)
 
-    def _build_msvc(self):
-        makefile_msc_file = os.path.join(self._source_subfolder, "Makefile.msc")
-        tools.replace_in_file(makefile_msc_file, "CFLAGS = /MD /O2 -I.", "CFLAGS = /nologo $(CFLAGS) -I.")
-        tools.replace_in_file(makefile_msc_file, "LDFLAGS =", "")
-        with tools.chdir(self._source_subfolder):
-            with tools.vcvars(self.settings):
-                with tools.environment_append(VisualStudioBuildEnvironment(self).vars):
-                    target = "libdeflate.dll" if self.options.shared else "libdeflatestatic.lib"
-                    self.run("nmake /f Makefile.msc {}".format(target))
+    def generate(self):
+        env = VirtualBuildEnv(self)
+        env.generate()
 
-    @property
-    def _make_program(self):
-        return tools.unix_path(tools.get_env("CONAN_MAKE_PROGRAM", tools.which("make") or tools.which("mingw32-make")))
+        if is_msvc(self) or self._is_clangcl:
+            vc = VCVars(self)
+            vc.generate()
+            # FIXME: no conan v2 build helper for NMake yet (see https://github.com/conan-io/conan/issues/12188)
+            #        So populate CL with AutotoolsToolchain cflags
+            env = Environment()
+            c_flags = AutotoolsToolchain(self).cflags
+            if c_flags:
+                env.define("CL", c_flags)
+            env.vars(self).save_script("conanbuildenv_nmake")
+        else:
+            tc = AutotoolsToolchain(self)
+            tc.generate()
+
+    def _build_nmake(self):
+        with chdir(self, self.source_folder):
+            target = "libdeflate.dll" if self.options.shared else "libdeflatestatic.lib"
+            self.run(f"nmake /f Makefile.msc {target}")
 
     def _build_make(self):
-        tools.replace_in_file(os.path.join(self._source_subfolder, "Makefile"), "-O2", "")
-        with tools.chdir(self._source_subfolder):
-            with tools.environment_append(AutoToolsBuildEnvironment(self).vars):
-                if self.settings.os == "Windows":
-                    suffix = ".dll" if self.options.shared else "static.lib"
-                elif tools.is_apple_os(self.settings.os):
-                    suffix = ".dylib" if self.options.shared else ".a"
-                else:
-                    suffix = ".so" if self.options.shared else ".a"
-                target = "libdeflate{}".format(suffix)
-                self.run("{0} -f Makefile {1}".format(self._make_program, target), win_bash=tools.os_info.is_windows)
+        autotools = Autotools(self)
+        with chdir(self, self.source_folder):
+            autotools.make()
 
     def build(self):
-        if self.settings.compiler == "Visual Studio":
-            self._build_msvc()
+        apply_conandata_patches(self)
+        if is_msvc(self) or self._is_clangcl:
+            self._build_nmake()
         else:
             self._build_make()
 
+    def _package_windows(self):
+        copy(self, "libdeflate.h", dst=os.path.join(self.package_folder, "include"), src=self.source_folder)
+        if self.options.shared:
+            copy(self, "*deflate.lib", dst=os.path.join(self.package_folder, "lib"), src=self.source_folder)
+            copy(self, "*deflate.dll", dst=os.path.join(self.package_folder, "bin"), src=self.source_folder)
+        else:
+            copy(self, "*deflatestatic.lib", dst=os.path.join(self.package_folder, "lib"), src=self.source_folder)
+
+    def _package_make(self):
+        autotools = Autotools(self)
+        with chdir(self, self.source_folder):
+            # Note: not actually an autotools project, is a Makefile project.
+            autotools.install(args=[f"DESTDIR={unix_path(self, self.package_folder)}", "PREFIX=/"])
+        rmdir(self, os.path.join(self.package_folder, "bin"))
+        rmdir(self, os.path.join(self.package_folder, "lib", "pkgconfig"))
+        rm(self, "*.a" if self.options.shared else "*.[so|dylib]*", os.path.join(self.package_folder, "lib") )
+
     def package(self):
-        self.copy("COPYING", dst="licenses", src=self._source_subfolder)
-        self.copy("libdeflate.h", dst="include", src=self._source_subfolder)
-        self.copy("*.lib", dst="lib", src=self._source_subfolder)
-        self.copy("*.dll", dst="bin", src=self._source_subfolder)
-        self.copy("*.a", dst="lib", src=self._source_subfolder)
-        self.copy("*.so*", dst="lib", src=self._source_subfolder, symlinks=True)
-        self.copy("*.dylib", dst="lib", src=self._source_subfolder, symlinks=True)
+        copy(self, "COPYING", self.source_folder, dst=os.path.join(self.package_folder, "licenses"))
+        if self.settings.os == "Windows":
+            self._package_windows()
+        else:
+            self._package_make()
 
     def package_info(self):
+        self.cpp_info.set_property("pkg_config_name", "libdeflate")
         prefix = "lib" if self.settings.os == "Windows" else ""
         suffix = "static" if self.settings.os == "Windows" and not self.options.shared else ""
-        self.cpp_info.libs = ["{0}deflate{1}".format(prefix, suffix)]
+        self.cpp_info.libs = [f"{prefix}deflate{suffix}"]
         if self.settings.os == "Windows" and self.options.shared:
             self.cpp_info.defines = ["LIBDEFLATE_DLL"]

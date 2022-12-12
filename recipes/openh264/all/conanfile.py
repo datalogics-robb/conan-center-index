@@ -1,6 +1,17 @@
-from conans import ConanFile, tools, AutoToolsBuildEnvironment
+from conan import ConanFile
+from conans import tools
+from conan.tools.env import VirtualBuildEnv
+from conan.tools.files import apply_conandata_patches, copy, export_conandata_patches, get, rmdir, replace_in_file, chdir
+from conan.tools.gnu import Autotools, AutotoolsToolchain
+from conan.tools.apple import is_apple_os, fix_apple_shared_install_name
+from conan.tools.layout import basic_layout
+from conan.tools.scm import Version
+from conan.tools.microsoft import is_msvc, unix_path, msvc_runtime_flag
+
 import os
-import fnmatch
+
+
+required_conan_version = ">=1.53.0"
 
 
 class OpenH264Conan(ConanFile):
@@ -8,7 +19,7 @@ class OpenH264Conan(ConanFile):
     url = "https://github.com/conan-io/conan-center-index"
     homepage = "http://www.openh264.org/"
     description = "Open Source H.264 Codec"
-    topics = ("conan", "h264", "codec", "video", "compression", )
+    topics = ("h264", "codec", "video", "compression", )
     license = "BSD-2-Clause"
 
     settings = "os", "arch", "compiler", "build_type"
@@ -17,14 +28,20 @@ class OpenH264Conan(ConanFile):
         "fPIC": [True, False],
     }
     default_options = {
-        "shared": "False",
+        "shared": False,
         "fPIC": True,
     }
-    exports_sources = "patches/**"
 
     @property
-    def _source_subfolder(self):
-        return "source_subfolder"
+    def _settings_build(self):
+        return getattr(self, "settings_build", self.settings)
+
+    @property
+    def _is_clang_cl(self):
+        return self.settings.os == 'Windows' and self.settings.compiler == 'clang'
+
+    def export_sources(self):
+        export_conandata_patches(self)
 
     def config_options(self):
         if self.settings.os == "Windows":
@@ -32,48 +49,53 @@ class OpenH264Conan(ConanFile):
 
     def configure(self):
         if self.options.shared:
-            del self.options.fPIC
+            self.options.rm_safe("fPIC")
+
+    def layout(self):
+        basic_layout(self, src_folder="src")
 
     def build_requirements(self):
-        self.build_requires("nasm/2.14")
-        if tools.os_info.is_windows and not tools.get_env("CONAN_BASH_PATH"):
-            self.build_requires("msys2/20200517")
+        if self.settings.arch in ("x86", "x86_64"):
+            self.tool_requires("nasm/2.15.05")
+        if self._settings_build.os == "Windows":
+            self.win_bash = True
+            if not self.conf.get("tools.microsoft.bash:path", default=False, check_type=str):
+                self.tool_requires("msys2/cci.latest")
+        if is_msvc(self):
+            self.tool_requires("automake/1.16.5")
 
     def source(self):
-        tools.get(**self.conan_data["sources"][self.version])
-        extracted_dir = self.name + "-" + self.version
-        os.rename(extracted_dir, self._source_subfolder)
+        get(self, **self.conan_data["sources"][self.version],
+            destination=self.source_folder, strip_root=True)
 
     def _patch_sources(self):
-        for patch in self.conan_data.get("patches", {}).get(self.version, []):
-            tools.patch(**patch)
-        if self.settings.compiler == "Visual Studio":
-            tools.replace_in_file(os.path.join(self._source_subfolder, "build", "platform-msvc.mk"),
-                                "CFLAGS_OPT += -MT",
-                                "CFLAGS_OPT += -%s" % str(self.settings.compiler.runtime))
-            tools.replace_in_file(os.path.join(self._source_subfolder, "build", "platform-msvc.mk"),
-                                "CFLAGS_DEBUG += -MTd -Gm",
-                                "CFLAGS_DEBUG += -%s -Gm" % str(self.settings.compiler.runtime))
+        if is_msvc(self):
+            replace_in_file(self, os.path.join(self.source_folder, "build", "platform-msvc.mk"),
+                            "CFLAGS_OPT += -MT",
+                            f"CFLAGS_OPT += -{msvc_runtime_flag(self)}")
+            replace_in_file(self, os.path.join(self.source_folder, "build", "platform-msvc.mk"),
+                            "CFLAGS_DEBUG += -MTd -Gm",
+                            f"CFLAGS_DEBUG += -{msvc_runtime_flag(self)} -Gm")
         if self.settings.os == "Android":
-            tools.replace_in_file(os.path.join(self._source_subfolder, "codec", "build", "android", "dec", "jni", "Application.mk"),
-                                  "APP_STL := stlport_shared",
-                                  "APP_STL := %s" % str(self.settings.compiler.libcxx))
-            tools.replace_in_file(os.path.join(self._source_subfolder, "codec", "build", "android", "dec", "jni", "Application.mk"),
-                                  "APP_PLATFORM := android-12",
-                                  "APP_PLATFORM := %s" % self._android_target)
+            replace_in_file(self, os.path.join(self.source_folder, "codec", "build", "android", "dec", "jni", "Application.mk"),
+                            "APP_STL := stlport_shared",
+                            f"APP_STL := {self.settings.compiler.libcxx}")
+            replace_in_file(self, os.path.join(self.source_folder, "codec", "build", "android", "dec", "jni", "Application.mk"),
+                            "APP_PLATFORM := android-12",
+                            f"APP_PLATFORM := {self._android_target}")
 
     @property
     def _library_filename(self):
-        prefix = "" if self.settings.compiler == "Visual Studio" else "lib"
+        prefix = "" if (is_msvc(self) or self._is_clang_cl) else "lib"
         if self.options.shared:
-            if tools.is_apple_os(self.settings.os):
+            if is_apple_os(self):
                 suffix = ".dylib"
             elif self.settings.os == "Windows":
                 suffix = ".dll"
             else:
                 suffix = ".so"
         else:
-            if self.settings.compiler == "Visual Studio":
+            if is_msvc(self) or self._is_clang_cl:
                 suffix = ".lib"
             else:
                 suffix = ".a"
@@ -81,88 +103,89 @@ class OpenH264Conan(ConanFile):
 
     @property
     def _make_arch(self):
-        if self.settings.os == "Android":
-            arch = str(self.settings.arch)
-            arch = {"armv7": "arm",
-                    "armv8": "arm64"}.get(arch, arch)
-        else:
-            if self.settings.arch == "x86":
-                arch = "i386"
-            elif self.settings.arch == "x86_64":
-                arch = "x86_64"
-            else:
-                arch = self.settings.arch
-        return arch
+        return {
+            "armv7": "arm",
+            "armv8": "arm64",
+            "x86": "i386",
+        }.get(str(self.settings.arch), str(self.settings.arch))
 
     @property
     def _android_target(self):
-        return "android-%s" % str(self.settings.os.api_level)
+        return f"android-{self.settings.os.api_level}"
 
     @property
     def _make_args(self):
-        prefix = os.path.abspath(self.package_folder)
-        if tools.os_info.is_windows:
-            prefix = tools.unix_path(prefix)
+        prefix = unix_path(self, os.path.abspath(self.package_folder))
         args = [
-            "ARCH=%s" % self._make_arch,
-            "PREFIX=%s" % prefix,
+            f"ARCH={self._make_arch}",
+            f"PREFIX={prefix}"
         ]
-        env_build = AutoToolsBuildEnvironment(self)
-        if self.settings.compiler == "Visual Studio":
-            env_build.flags.extend(["-nologo", "-{}".format(self.settings.compiler.runtime)])
-            env_build.link_flags.insert(0, "-link")
-        if self.options.shared:
-            env_build.fpic = True
-        args.extend(["{}={}".format(k, v) for k,v in env_build.vars.items()])
 
-        if self.settings.compiler == "Visual Studio":
+        if is_msvc(self) or self._is_clang_cl:
             args.append("OS=msvc")
-            env_build.flags.append("-FS")
         else:
             if self.settings.os == "Windows":
                 args.append("OS=mingw_nt")
             if self.settings.os == "Android":
                 libcxx = str(self.settings.compiler.libcxx)
-                stl_lib = "$(NDKROOT)/sources/cxx-stl/llvm-libc++/libs/$(APP_ABI)/lib%s " % ("c++_static.a" if libcxx == "c++_static" else "c++_shared.so") \
+                stl_lib = f'$(NDKROOT)/sources/cxx-stl/llvm-libc++/libs/$(APP_ABI)/lib{"c++_static.a" if libcxx == "c++_static" else "c++_shared.so"}' \
                           + "$(NDKROOT)/sources/cxx-stl/llvm-libc++/libs/$(APP_ABI)/libc++abi.a"
                 ndk_home = os.environ["ANDROID_NDK_HOME"]
                 args.extend([
-                    "NDKLEVEL=%s" % str(self.settings.os.api_level),
-                    "STL_LIB=%s" % stl_lib,
+                    f"NDKLEVEL={self.settings.os.api_level}",
+                    f"STL_LIB={stl_lib}",
                     "OS=android",
-                    "NDKROOT=%s" % ndk_home,  # not NDK_ROOT here
-                    "TARGET=%s" % self._android_target,
+                    f"NDKROOT={ndk_home}",  # not NDK_ROOT here
+                    f"TARGET={self._android_target}",
                     "CCASFLAGS=$(CFLAGS) -fno-integrated-as",
                 ])
 
         return args
 
+    def generate(self):
+        env = VirtualBuildEnv(self)
+        env.generate()
+        tc = AutotoolsToolchain(self)
+        tc.make_args.extend(self._make_args)
+
+        if is_msvc(self):
+            tc.extra_cxxflags.append("-nologo")
+            if not (self.settings.compiler == "Visual Studio" and Version(self.settings.compiler.version) < "12"):
+                tc.extra_cxxflags.append("-FS")
+        # not needed during and after 2.3.1
+        elif self.settings.compiler in ("apple-clang",):
+            if self.settings.arch in ("armv8",):
+                tc.extra_ldflags.append("-arch arm64")
+        tc.generate()
+
     def build(self):
+        apply_conandata_patches(self)
         self._patch_sources()
-        with tools.vcvars(self.settings) if self.settings.compiler == "Visual Studio" else tools.no_op():
-            with tools.chdir(self._source_subfolder):
-                env_build = AutoToolsBuildEnvironment(self)
-                env_build.make(args=self._make_args, target=self._library_filename)
+        autotools = Autotools(self)
+        with chdir(self, self.source_folder):
+            autotools.make(target=self._library_filename)
 
     def package(self):
-        self.copy(pattern="LICENSE", dst="licenses", src=self._source_subfolder)
-        with tools.vcvars(self.settings) if self.settings.compiler == "Visual Studio" else tools.no_op():
-            with tools.chdir(self._source_subfolder):
-                env_build = AutoToolsBuildEnvironment(self)
-                env_build.make(args=self._make_args, target="install-" + ("shared" if self.options.shared else "static-lib"))
+        copy(self, pattern="LICENSE", dst=os.path.join(
+            self.package_folder, "licenses"), src=self.source_folder)
+        autotools = Autotools(self)
+        with chdir(self, self.source_folder):
+            autotools.make(
+                target=f'install-{"shared" if self.options.shared else "static-lib"}')
 
-        tools.rmdir(os.path.join(self.package_folder, "lib", "pkgconfig"))
+        rmdir(self, os.path.join(self.package_folder, "lib", "pkgconfig"))
+        fix_apple_shared_install_name(self)
 
     def package_info(self):
-        if self.settings.compiler == "Visual Studio" and self.options.shared:
-            self.cpp_info.libs = ["openh264_dll"]
-        else:
-            self.cpp_info.libs = ["openh264"]
-        if self.settings.os == "Linux":
+        self.cpp_info.set_property("pkg_config_name", "openh264")
+        suffix = "_dll" if (
+            is_msvc(self) or self._is_clang_cl) and self.options.shared else ""
+        self.cpp_info.libs = [f"openh264{suffix}"]
+        if self.settings.os in ("FreeBSD", "Linux"):
             self.cpp_info.system_libs.extend(["m", "pthread"])
         if self.settings.os == "Android":
             self.cpp_info.system_libs.append("m")
-        self.cpp_info.names["pkg_config"] = "openh264"
+        # TODO: switch to conan.tools.build.stdcpp_library in conan 1.54
         libcxx = tools.stdcpp_library(self)
         if libcxx:
             self.cpp_info.system_libs.append(libcxx)

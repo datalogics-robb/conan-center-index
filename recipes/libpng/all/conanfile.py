@@ -1,6 +1,14 @@
+from conan import ConanFile
+from conan.errors import ConanInvalidConfiguration
+from conan.tools.apple import is_apple_os
+from conan.tools.build import cross_building
+from conan.tools.cmake import CMake, CMakeToolchain, CMakeDeps, cmake_layout
+from conan.tools.files import apply_conandata_patches, copy, export_conandata_patches, get, replace_in_file, rm, rmdir
+from conan.tools.microsoft import is_msvc
+from conan.tools.scm import Version
 import os
-from conans import ConanFile, tools, CMake
-from conans.errors import ConanException
+
+required_conan_version = ">=1.53.0"
 
 
 class LibpngConan(ConanFile):
@@ -9,96 +17,180 @@ class LibpngConan(ConanFile):
     url = "https://github.com/conan-io/conan-center-index"
     homepage = "http://www.libpng.org"
     license = "libpng-2.0"
-    exports_sources = ["CMakeLists.txt", "patches/*"]
-    generators = ["cmake", "cmake_find_package"]
+    topics = ("png", "graphics", "image")
     settings = "os", "arch", "compiler", "build_type"
-    options = {"shared": [True, False], "fPIC": [True, False], "api_prefix": "ANY"}
-    default_options = {'shared': False, 'fPIC': True, "api_prefix": None}
-    topics = ("conan", "png", "libpng")
+    options = {
+        "shared": [True, False],
+        "fPIC": [True, False],
+        "neon": [True, "check", False],
+        "msa": [True, False],
+        "sse": [True, False],
+        "vsx": [True, False],
+        "api_prefix": ["ANY"],
+    }
+    default_options = {
+        "shared": False,
+        "fPIC": True,
+        "neon": True,
+        "msa": True,
+        "sse": True,
+        "vsx": True,
+        "api_prefix": "",
+    }
 
-    _source_subfolder = "source_subfolder"
+    @property
+    def _has_neon_support(self):
+        return "arm" in self.settings.arch
 
-    def requirements(self):
-        self.requires("zlib/1.2.11")
+    @property
+    def _has_msa_support(self):
+        return "mips" in self.settings.arch
+
+    @property
+    def _has_sse_support(self):
+        return self.settings.arch in ["x86", "x86_64"]
+
+    @property
+    def _has_vsx_support(self):
+        return "ppc" in self.settings.arch
+
+    def export_sources(self):
+        export_conandata_patches(self)
 
     def config_options(self):
         if self.settings.os == "Windows":
             del self.options.fPIC
+        if not self._has_neon_support:
+            del self.options.neon
+        if not self._has_msa_support:
+            del self.options.msa
+        if not self._has_sse_support:
+            del self.options.sse
+        if not self._has_vsx_support:
+            del self.options.vsx
 
     def configure(self):
-        del self.settings.compiler.libcxx
-        del self.settings.compiler.cppstd
+        if self.options.shared:
+            self.options.rm_safe("fPIC")
+        self.settings.rm_safe("compiler.libcxx")
+        self.settings.rm_safe("compiler.cppstd")
+
+    def layout(self):
+        cmake_layout(self, src_folder="src")
+
+    def requirements(self):
+        self.requires("zlib/1.2.13")
+
+    def validate(self):
+        if Version(self.version) < "1.6" and self.info.settings.arch == "armv8" and is_apple_os(self):
+            raise ConanInvalidConfiguration(f"{self.ref} currently does not building for {self.info.settings.os} {self.info.settings.arch}. Contributions are welcomed")
 
     def source(self):
-        tools.get(**self.conan_data["sources"][self.version])
-        os.rename("libpng-" + self.version, self._source_subfolder)
+        get(self, **self.conan_data["sources"][self.version],
+                  destination=self.source_folder, strip_root=True)
 
-    def _patch(self):
-        tools.patch(base_path=self._source_subfolder, patch_file=os.path.join("patches", "CMakeLists-zlib.patch"))
-        tools.replace_in_file(os.path.join(self._source_subfolder, "CMakeLists.txt"),
-                              "find_library(M_LIBRARY m)",
-                              "set(M_LIBRARY m)")
+    @property
+    def _neon_msa_sse_vsx_mapping(self):
+        return {
+            "True": "on",
+            "False": "off",
+            "check": "check",
+        }
 
-        if tools.os_info.is_windows:
-            if self.settings.compiler == "Visual Studio":
-                tools.replace_in_file(os.path.join(self._source_subfolder, "CMakeLists.txt"),
-                                     'OUTPUT_NAME "${PNG_LIB_NAME}_static',
-                                     'OUTPUT_NAME "${PNG_LIB_NAME}')
+    @property
+    def _libpng_cmake_system_processor(self):
+        # FIXME: too specific and error prone, should be delegated to a conan helper function
+        # It should satisfy libpng CMakeLists specifically, do not use it naively in an other recipe
+        if "mips" in self.settings.arch:
+            return "mipsel"
+        if "ppc" in self.settings.arch:
+            return "powerpc"
+        return str(self.settings.arch)
+
+    def generate(self):
+        tc = CMakeToolchain(self)
+        tc.variables["PNG_TESTS"] = False
+        tc.variables["PNG_SHARED"] = self.options.shared
+        tc.variables["PNG_STATIC"] = not self.options.shared
+        tc.variables["PNG_DEBUG"] = self.settings.build_type == "Debug"
+        tc.variables["PNG_PREFIX"] = self.options.api_prefix
+        if cross_building(self):
+            system_processor = self.conf.get("tools.cmake.cmaketoolchain:system_processor",
+                                                  self._libpng_cmake_system_processor, check_type=str)
+            tc.cache_variables["CMAKE_SYSTEM_PROCESSOR"] = system_processor
+        if self._has_neon_support:
+            tc.variables["PNG_ARM_NEON"] = self._neon_msa_sse_vsx_mapping[str(self.options.neon)]
+        if self._has_msa_support:
+            tc.variables["PNG_MIPS_MSA"] = self._neon_msa_sse_vsx_mapping[str(self.options.msa)]
+        if self._has_sse_support:
+            tc.variables["PNG_INTEL_SSE"] = self._neon_msa_sse_vsx_mapping[str(self.options.sse)]
+        if self._has_vsx_support:
+            tc.variables["PNG_POWERPC_VSX"] = self._neon_msa_sse_vsx_mapping[str(self.options.vsx)]
+        if Version(self.version) >= "1.6.38":
+            tc.variables["PNG_EXECUTABLES"] = False
+
+        tc.cache_variables["CMAKE_MACOSX_BUNDLE"] = False
+        tc.generate()
+        tc = CMakeDeps(self)
+        tc.generate()
+
+    def _patch_sources(self):
+        apply_conandata_patches(self)
+        if self.settings.os == "Windows":
+            if Version(self.version) <= "1.5.2":
+                replace_in_file(self, os.path.join(self.source_folder, "CMakeLists.txt"),
+                                      'set(PNG_LIB_NAME_STATIC ${PNG_LIB_NAME}_static)',
+                                      'set(PNG_LIB_NAME_STATIC ${PNG_LIB_NAME})')
             else:
-                tools.replace_in_file(os.path.join(self._source_subfolder, "CMakeLists.txt"),
-                                      'COMMAND "${CMAKE_COMMAND}" -E copy_if_different $<TARGET_LINKER_FILE_NAME:${S_TARGET}> $<TARGET_LINKER_FILE_DIR:${S_TARGET}>/${DEST_FILE}',
+                replace_in_file(self, os.path.join(self.source_folder, "CMakeLists.txt"),
+                                    'OUTPUT_NAME "${PNG_LIB_NAME}_static',
+                                    'OUTPUT_NAME "${PNG_LIB_NAME}')
+            if not is_msvc(self):
+                if Version(self.version) < "1.6.38":
+                    src_text = 'COMMAND "${CMAKE_COMMAND}" -E copy_if_different $<TARGET_LINKER_FILE_NAME:${S_TARGET}> $<TARGET_LINKER_FILE_DIR:${S_TARGET}>/${DEST_FILE}'
+                else:
+                    src_text = '''COMMAND "${CMAKE_COMMAND}"
+                                 -E copy_if_different
+                                 $<TARGET_LINKER_FILE_NAME:${S_TARGET}>
+                                 $<TARGET_LINKER_FILE_DIR:${S_TARGET}>/${DEST_FILE}'''
+                replace_in_file(self, os.path.join(self.source_folder, "CMakeLists.txt"),
+                                      src_text,
                                       'COMMAND "${CMAKE_COMMAND}" -E copy_if_different $<TARGET_LINKER_FILE_DIR:${S_TARGET}>/$<TARGET_LINKER_FILE_NAME:${S_TARGET}> $<TARGET_LINKER_FILE_DIR:${S_TARGET}>/${DEST_FILE}')
 
-        if self.settings.build_type == 'Debug':
-            tools.replace_in_file(os.path.join(self._source_subfolder, 'libpng.pc.in'),
-                                  '-lpng@PNGLIB_MAJOR@@PNGLIB_MINOR@',
-                                  '-lpng@PNGLIB_MAJOR@@PNGLIB_MINOR@d')
-
-    def _configure_cmake(self):
-        cmake = CMake(self)
-        cmake.definitions["PNG_TESTS"] = "OFF"
-        cmake.definitions["PNG_SHARED"] = self.options.shared
-        cmake.definitions["PNG_STATIC"] = not self.options.shared
-        cmake.definitions["PNG_DEBUG"] = "OFF" if self.settings.build_type == "Release" else "ON"
-        if self.settings.os == "Emscripten":
-            cmake.definitions["PNG_BUILD_ZLIB"] = "ON"
-            cmake.definitions["M_LIBRARY"] = ""
-            cmake.definitions["ZLIB_LIBRARY"] = self.deps_cpp_info["zlib"].libs[0]
-            cmake.definitions["ZLIB_INCLUDE_DIR"] = self.deps_cpp_info["zlib"].include_paths[0]
-        if self.settings.os == "Macos":
-            if 'arm' in self.settings.arch:
-                cmake.definitions["PNG_ARM_NEON"] = "on"
-        if self.options.api_prefix:
-            cmake.definitions["PNG_PREFIX"] = self.options.api_prefix
-        cmake.configure()
-        return cmake
-
     def build(self):
-        self._patch()
-        cmake = self._configure_cmake()
+        self._patch_sources()
+        cmake = CMake(self)
+        cmake.configure()
         cmake.build()
 
     def package(self):
-        self.copy("LICENSE", src=self._source_subfolder, dst="licenses", ignore_case=True, keep_path=False)
-        cmake = self._configure_cmake()
+        copy(self, "LICENSE", src=self.source_folder, dst=os.path.join(self.package_folder, "licenses"))
+        cmake = CMake(self)
         cmake.install()
-        tools.rmdir(os.path.join(self.package_folder, 'share'))
-        tools.rmdir(os.path.join(self.package_folder, 'lib', 'libpng'))
-        tools.rmdir(os.path.join(self.package_folder, 'lib', 'pkgconfig'))
+        if self.options.shared:
+            rm(self, "*[!.dll]", os.path.join(self.package_folder, "bin"))
+        else:
+            rmdir(self, os.path.join(self.package_folder, "bin"))
+        rmdir(self, os.path.join(self.package_folder, "lib", "libpng"))
+        rmdir(self, os.path.join(self.package_folder, "lib", "pkgconfig"))
+        rmdir(self, os.path.join(self.package_folder, "share"))
 
     def package_info(self):
+        major_min_version = f"{Version(self.version).major}{Version(self.version).minor}"
+
+        self.cpp_info.set_property("cmake_find_mode", "both")
+        self.cpp_info.set_property("cmake_file_name", "PNG")
+        self.cpp_info.set_property("cmake_target_name", "PNG::PNG")
+        self.cpp_info.set_property("pkg_config_name", "libpng")
+        self.cpp_info.set_property("pkg_config_aliases", [f"libpng{major_min_version}"])
+
+        prefix = "lib" if is_msvc(self) else ""
+        suffix = major_min_version if self.settings.os == "Windows" else ""
+        suffix += "d" if self.settings.os == "Windows" and self.settings.build_type == "Debug" else ""
+        self.cpp_info.libs = [f"{prefix}png{suffix}"]
+        if self.settings.os in ["Linux", "Android", "FreeBSD", "SunOS", "AIX"]:
+            self.cpp_info.system_libs.append("m")
+
+        # TODO: Remove after Conan 2.0
         self.cpp_info.names["cmake_find_package"] = "PNG"
         self.cpp_info.names["cmake_find_package_multi"] = "PNG"
-
-        if self.settings.os == "Windows":
-            if self.settings.compiler == "gcc":
-                self.cpp_info.libs = ["png"]
-            else:
-                self.cpp_info.libs = ['libpng16']
-        else:
-            self.cpp_info.libs = ["png16"]
-            if str(self.settings.os) in ["Linux", "Android", "FreeBSD"]:
-                self.cpp_info.system_libs.append("m")
-        # use 'd' suffix everywhere except mingw
-        if self.settings.build_type == "Debug" and not (self.settings.os == "Windows" and self.settings.compiler == "gcc"):
-            self.cpp_info.libs[0] += "d"

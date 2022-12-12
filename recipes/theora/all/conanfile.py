@@ -1,124 +1,90 @@
+from conan import ConanFile
+from conan.tools.cmake import CMakeToolchain, CMake, CMakeDeps, cmake_layout
+from conan.tools.files import copy, download, get, replace_in_file
+from conan.tools.microsoft import is_msvc
+from conan.errors import ConanException
 import os
-import shutil
-import stat
-from conans import ConanFile, MSBuild, AutoToolsBuildEnvironment, tools
 
+required_conan_version = ">=1.52.0"
 
 class TheoraConan(ConanFile):
     name = "theora"
-    description = "Theora is a free and open video compression format from the Xiph.org Foundation"
+    license = "BSD-3-Clause"
     url = "https://github.com/conan-io/conan-center-index"
     homepage = "https://github.com/xiph/theora"
-    topics = ("conan", "theora", "video", "video-compressor", "video-format")
-    license = "BSD-3-Clause"
-    settings = "os", "arch", "compiler", "build_type"
+    description = "Theora is a free and open video compression format from the Xiph.org Foundation"
+    topics = "video", "video-compressor", "video-format"
+
+    settings = "os", "compiler", "build_type", "arch"
     options = {"shared": [True, False], "fPIC": [True, False]}
     default_options = {"shared": False, "fPIC": True}
-    requires = (
-        "ogg/1.3.4",
-        "vorbis/1.3.7"
-    )
-    _source_subfolder = "source_subfolder"
-    _autotools = None
+
+    def export_sources(self):
+        copy(self, "CMakeLists.txt", self.recipe_folder, os.path.join(self.export_sources_folder,"src"))
 
     def config_options(self):
-        if self.settings.os == 'Windows':
+        if self.settings.os == "Windows":
             del self.options.fPIC
 
     def configure(self):
         if self.options.shared:
-            del self.options.fPIC
-        del self.settings.compiler.libcxx
-        del self.settings.compiler.cppstd
+            try:
+                del self.options.fPIC
+            except ConanException:
+                pass
+        try:
+            del self.settings.compiler.libcxx
+        except ConanException:
+            pass
+        try:
+            del self.settings.compiler.cppstd
+        except ConanException:
+            pass
+
+    def layout(self):
+        cmake_layout(self, src_folder="src")
+
+    def requirements(self):
+        self.requires("ogg/1.3.5")
 
     def source(self):
-        tools.get(**self.conan_data["sources"][self.version][0], strip_root=True, destination=self._source_subfolder)
+        get(self, **self.conan_data["sources"][self.version], destination=self.source_folder, strip_root=True)
 
-        source = self.conan_data["sources"][self.version][1]
-        url = source["url"]
-        filename = url[url.rfind("/") + 1:]
-        tools.download(url, filename)
-        tools.check_sha256(filename, source["sha256"])
-        
-        shutil.move(filename, os.path.join(self._source_subfolder, 'lib', filename))
-
-    def _configure_autotools(self):
-        if not self._autotools:
-            permission = stat.S_IMODE(os.lstat("configure").st_mode)
-            os.chmod("configure", (permission | stat.S_IEXEC))
-            self._autotools = AutoToolsBuildEnvironment(self, win_bash=tools.os_info.is_windows)
-            configure_args = ['--disable-examples']
-            if self.options.shared:
-                configure_args.extend(['--disable-static', '--enable-shared'])
-            else:
-                configure_args.extend(['--disable-shared', '--enable-static'])
-            self._autotools.configure(args=configure_args)
-        return self._autotools
+    def generate(self):
+        tc = CMakeToolchain(self)
+        tc.variables["USE_X86_32"] = (self.settings.arch == "x86")
+        # note: MSVC does not support inline assembly for 64 bit builds
+        tc.variables["USE_X86_64"] = (self.settings.arch == "x86_64" and not is_msvc(self))
+        tc.generate()
+        cd = CMakeDeps(self)
+        cd.generate()
 
     def build(self):
-        if self.settings.compiler == 'Visual Studio':
-            self._build_msvc()
-        else:
-            with tools.chdir(self._source_subfolder):
-                autotools = self._configure_autotools()
-                autotools.make()
-
-    def _build_msvc(self):
-        # error C2491: 'rint': definition of dllimport function not allowed
-        tools.replace_in_file(os.path.join(self._source_subfolder, 'examples', 'encoder_example.c'),
-                              'static double rint(double x)',
-                              'static double rint_(double x)')
-
-        def format_libs(libs):
-            return ' '.join([l + '.lib' for l in libs])
-
-        # fix hard-coded library names
-        project = 'libtheora'
-        config = "dynamic" if self.options.shared else "static"
-
-        vcvproj = '%s_%s.vcproj' % (project, config)
-        vcvproj_path = os.path.join(self._source_subfolder, 'win32', 'VS2008', project, vcvproj)
-        tools.replace_in_file(vcvproj_path,
-                                'libogg.lib',
-                                format_libs(self.deps_cpp_info['ogg'].libs), strict=False)
-        tools.replace_in_file(vcvproj_path,
-                                'libogg_static.lib',
-                                format_libs(self.deps_cpp_info['ogg'].libs), strict=False)
-        tools.replace_in_file(vcvproj_path,
-                                'libvorbis.lib',
-                                format_libs(self.deps_cpp_info['vorbis'].libs), strict=False)
-        tools.replace_in_file(vcvproj_path,
-                                'libvorbis_static.lib',
-                                format_libs(self.deps_cpp_info['vorbis'].libs), strict=False)
-        if "MT" in self.settings.compiler.runtime:
-            tools.replace_in_file(vcvproj_path, 'RuntimeLibrary="2"', 'RuntimeLibrary="0"')
-            tools.replace_in_file(vcvproj_path, 'RuntimeLibrary="3"', 'RuntimeLibrary="1"')
-
-        with tools.chdir(os.path.join(self._source_subfolder, 'win32', 'VS2008', 'libtheora')):
-            proj = 'libtheora_dynamic' if self.options.shared else 'libtheora_static'
-            msbuild = MSBuild(self)
-            try:
-                # upgrade .vcproj
-                msbuild.build(proj + '.vcproj', platforms={'x86': 'Win32', 'x86_64': 'x64'})
-            except:
-                # build .vcxproj
-                msbuild.build(proj + '.vcxproj', platforms={'x86': 'Win32', 'x86_64': 'x64'})
+        cmake = CMake(self)
+        cmake.configure()
+        cmake.build()
 
     def package(self):
-        self.copy(pattern="LICENSE", dst="licenses", src=self._source_subfolder)
-        self.copy(pattern="COPYING", dst="licenses", src=self._source_subfolder)
-        if self.settings.compiler == 'Visual Studio':
-            include_folder = os.path.join(self._source_subfolder, "include")
-            self.copy(pattern="*.h", dst="include", src=include_folder)
-            self.copy(pattern="*.dll", dst="bin", keep_path=False)
-            self.copy(pattern="*.lib", dst="lib", keep_path=False)
-        else:
-            with tools.chdir(self._source_subfolder):
-                autotools = self._configure_autotools()
-                autotools.install()
-            tools.remove_files_by_mask(os.path.join(self.package_folder, "lib"), "*.la")
-            tools.rmdir(os.path.join(self.package_folder, "lib", "pkgconfig"))
-            tools.rmdir(os.path.join(self.package_folder, "share"))
+        copy(self, "COPYING", src=self.source_folder, dst=os.path.join(self.package_folder, "licenses"))
+        copy(self, "LICENSE", src=self.source_folder, dst=os.path.join(self.package_folder, "licenses"))
+        cmake = CMake(self)
+        cmake.install()
 
     def package_info(self):
-        self.cpp_info.libs = tools.collect_libs(self)
+        self.cpp_info.set_property("pkg_config_name", "theora_full_package_do_not_use")    # to avoid conflicts with theora component
+
+        self.cpp_info.components["theora"].set_property("pkg_config_name", "theora")
+        self.cpp_info.components["theora"].libs = ["theora"]
+        self.cpp_info.components["theora"].requires = ["ogg::ogg"]
+
+        self.cpp_info.components["theoradec"].set_property("pkg_config_name", "theoradec")
+        self.cpp_info.components["theoradec"].libs = ["theoradec"]
+        self.cpp_info.components["theoradec"].requires = ["ogg::ogg"]
+
+        self.cpp_info.components["theoraenc"].set_property("pkg_config_name", "theoraenc")
+        self.cpp_info.components["theoraenc"].libs = ["theoraenc"]
+        self.cpp_info.components["theoraenc"].requires = ["ogg::ogg"]
+
+
+        # TODO: to remove in conan v2 once pkg_config generator removed
+        self.cpp_info.names["pkg_config"] = "theora_full_package"

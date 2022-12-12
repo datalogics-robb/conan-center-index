@@ -1,71 +1,78 @@
-"""Conan recipe package for cppcheck
-"""
+from conan import ConanFile
+from conan.tools.apple import is_apple_os
+from conan.tools.cmake import CMake, CMakeToolchain, CMakeDeps, cmake_layout
+from conan.tools.files import apply_conandata_patches, copy, export_conandata_patches, get, rmdir
+from conan.tools.scm import Version
 import os
-from conans import ConanFile, CMake, tools
+
+required_conan_version = ">=1.52.0"
 
 
 class CppcheckConan(ConanFile):
     name = "cppcheck"
     url = "https://github.com/conan-io/conan-center-index"
     homepage = "https://github.com/danmar/cppcheck"
-    topics = ("Cpp Check", "static analyzer")
+    topics = ("code quality", "static analyzer", "linter")
     description = "Cppcheck is an analysis tool for C/C++ code."
     license = "GPL-3.0-or-later"
-    generators = "cmake"
     settings = "os", "arch", "compiler", "build_type"
     options = {"with_z3": [True, False], "have_rules": [True, False]}
     default_options = {"with_z3": True, "have_rules": True}
-    exports_sources = ["CMakeLists.txt", "patches/**"]
 
-    _cmake = None
-    
-    @property
-    def _source_subfolder(self):
-        return "source_subfolder"
+    def layout(self):
+        cmake_layout(self)
 
-    @property
-    def _build_subfolder(self):
-        return "build_subfolder"
-        
-    def _patch_sources(self):
-        for patch in self.conan_data["patches"][self.version]:
-            tools.patch(**patch)
+    def export_sources(self):
+        export_conandata_patches(self)
+
+    def config_options(self):
+        if Version(self.version) >= Version("2.8.0"):
+            del self.options.with_z3
 
     def requirements(self):
-        if self.options.with_z3:
+        if self.options.get_safe("with_z3", default=False):
             self.requires("z3/4.8.8")
         if self.options.have_rules:
-            self.requires("pcre/8.44")
+            self.requires("pcre/8.45")
 
     def source(self):
-        tools.get(**self.conan_data["sources"][self.version])
-        extracted_dir = "cppcheck-" + self.version
-        os.rename(extracted_dir, self._source_subfolder)
+        get(self, **self.conan_data["sources"][self.version], strip_root=True)
 
-    def _configure_cmake(self):
-        if self._cmake:
-            return self._cmake
-        self._cmake = CMake(self)
-        self._cmake.definitions["USE_Z3"] = self.options.with_z3
-        self._cmake.definitions["HAVE_RULES"] = self.options.have_rules
-        self._cmake.definitions["USE_MATCHCOMPILER"] = "Auto"
-        self._cmake.definitions["ENABLE_OSS_FUZZ"] = False
-        self._cmake.configure(build_folder=self._build_subfolder)
-        return self._cmake
+    def generate(self):
+        tc = CMakeToolchain(self)
+        if Version(self.version) < "2.8.0":
+            tc.variables["USE_Z3"] = self.options.with_z3
+        tc.variables["HAVE_RULES"] = self.options.have_rules
+        tc.variables["USE_MATCHCOMPILER"] = "Auto"
+        tc.variables["ENABLE_OSS_FUZZ"] = False
+        if is_apple_os(self):
+            tc.variables["FILESDIR"] = os.path.join(self.package_folder, "bin", "cfg")
+        tc.generate()
+
+        deps = CMakeDeps(self)
+        deps.generate()
 
     def build(self):
-        self._patch_sources()
-        cmake = self._configure_cmake()
+        apply_conandata_patches(self)
+        cmake = CMake(self)
+        cmake.configure()
         cmake.build()
 
     def package(self):
-        self.copy("COPYING", dst="licenses", src=self._source_subfolder)
-        self.copy("*", dst=os.path.join("bin","cfg"), src=os.path.join(self._source_subfolder,"cfg"))
-        cmake = self._configure_cmake()
+        copy(self, "COPYING", dst=os.path.join(self.package_folder, "licenses"), src=os.path.join(self.source_folder))
+        copy(self, "*", dst=os.path.join(self.package_folder, "bin", "cfg"), src=os.path.join(self.source_folder, "cfg"))
+        copy(self, "cppcheck-htmlreport", dst=os.path.join(self.package_folder, "bin"), src=os.path.join(self.source_folder, "htmlreport"))
+        cmake = CMake(self)
         cmake.install()
-        tools.rmdir(os.path.join(self.package_folder, "share"))
-        
+        rmdir(self, os.path.join(self.package_folder, "share"))
+
     def package_info(self):
+        self.cpp_info.includedirs = []
+        self.cpp_info.libdirs = []
+
         bin_folder = os.path.join(self.package_folder, "bin")
         self.output.info("Append %s to environment variable PATH" % bin_folder)
         self.env_info.PATH.append(bin_folder)
+        cppcheck_htmlreport = os.path.join(bin_folder, "cppcheck-htmlreport")
+        self.env_info.CPPCHECK_HTMLREPORT = cppcheck_htmlreport
+        self.runenv_info.define_path("CPPCHECK_HTMLREPORT", cppcheck_htmlreport)

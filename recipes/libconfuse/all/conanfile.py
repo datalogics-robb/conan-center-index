@@ -1,12 +1,20 @@
-from conans import ConanFile, AutoToolsBuildEnvironment, tools
-from contextlib import contextmanager
+from conan import ConanFile
+from conan.tools.apple import fix_apple_shared_install_name
+from conan.tools.env import Environment, VirtualBuildEnv
+from conan.tools.files import copy, get, rename, replace_in_file, rm, rmdir
+from conan.tools.gnu import Autotools, AutotoolsToolchain
+from conan.tools.layout import basic_layout
+from conan.tools.microsoft import is_msvc, unix_path
+from conan.tools.scm import Version
 import os
 
+required_conan_version = ">=1.53.0"
 
-class LibConfuse(ConanFile):
+
+class LibConfuseConan(ConanFile):
     name = "libconfuse"
     description = "Small configuration file parser library for C"
-    topics = ("conan", "libconfuse", "configuration", "parser")
+    topics = ("configuration", "parser")
     url = "https://github.com/conan-io/conan-center-index"
     homepage = "https://github.com/martinh/libconfuse"
     license = "ISC"
@@ -20,11 +28,9 @@ class LibConfuse(ConanFile):
         "fPIC": True,
     }
 
-    _autotools = None
-
     @property
-    def _source_subfolder(self):
-        return "source_subfolder"
+    def _settings_build(self):
+        return getattr(self, "settings_build", self.settings)
 
     def config_options(self):
         if self.settings.os == "Windows":
@@ -32,69 +38,67 @@ class LibConfuse(ConanFile):
 
     def configure(self):
         if self.options.shared:
-            del self.options.fPIC
-        del self.settings.compiler.libcxx
-        del self.settings.compiler.cppstd
+            self.options.rm_safe("fPIC")
+        self.settings.rm_safe("compiler.libcxx")
+        self.settings.rm_safe("compiler.cppstd")
 
-    def source(self):
-        tools.get(**self.conan_data["sources"][self.version])
-        os.rename("confuse-{}".format(self.version), self._source_subfolder)
+    def layout(self):
+        basic_layout(self, src_folder="src")
 
     def build_requirements(self):
-        if tools.os_info.is_windows and not os.environ.get("CONAN_BASH_PATH") and \
-                tools.os_info.detect_windows_subsystem() != "msys2":
-            self.build_requires("msys2/20190524")
+        if self._settings_build.os == "Windows":
+            self.win_bash = True
+            if not self.conf.get("tools.microsoft.bash:path", check_type=str):
+                self.tool_requires("msys2/cci.latest")
 
-    def _configure_autotools(self):
-        if self._autotools:
-            return self._autotools
-        self._autotools = AutoToolsBuildEnvironment(self, win_bash=tools.os_info.is_windows)
-        conf_args = []
-        if self.options.shared:
-            conf_args.extend(["--enable-shared", "--disable-static"])
-        else:
-            conf_args.extend(["--disable-shared", "--enable-static"])
-        self._autotools.configure(configure_dir=self._source_subfolder, args=conf_args)
-        return self._autotools
+    def source(self):
+        get(self, **self.conan_data["sources"][self.version],
+            destination=self.source_folder, strip_root=True)
 
-    @contextmanager
-    def _build_context(self):
-        if self.settings.compiler == "Visual Studio":
-            with tools.vcvars(self.settings):
-                with tools.environment_append({"CC": "cl -nologo",
-                                               "CXX": "cl -nologo",
-                                               "LD": "link"}):
-                    yield
-        else:
-            yield
+    def generate(self):
+        env = VirtualBuildEnv(self)
+        env.generate()
+
+        tc = AutotoolsToolchain(self)
+        if (self.settings.compiler == "Visual Studio" and Version(self.settings.compiler.version) >= "12") or \
+           (self.settings.compiler == "msvc" and Version(self.settings.compiler.version) >= "180"):
+            tc.extra_cflags.append("-FS")
+        tc.generate()
+
+        if is_msvc(self):
+            env = Environment()
+            env.define("CC", "cl -nologo")
+            env.define("CXX", "cl -nologo")
+            env.define("LD", "link -nologo")
+            env.vars(self).save_script("conanbuild_libconfuse_msvc")
 
     def _patch_sources(self):
-        tools.replace_in_file(os.path.join(self._source_subfolder, "Makefile.in"),
+        replace_in_file(self, os.path.join(self.source_folder, "Makefile.in"),
                               "SUBDIRS = m4 po src $(EXAMPLES) tests doc",
                               "SUBDIRS = m4 src")
         if not self.options.shared:
-            tools.replace_in_file(os.path.join(self._source_subfolder, "src", "confuse.h"),
+            replace_in_file(self, os.path.join(self.source_folder, "src", "confuse.h"),
                                   "__declspec (dllimport)", "")
 
     def build(self):
         self._patch_sources()
-        with self._build_context():
-            autotools = self._configure_autotools()
-            autotools.make()
+        autotools = Autotools(self)
+        autotools.configure()
+        autotools.make()
 
     def package(self):
-        self.copy(pattern="LICENSE", dst="licenses", src=self._source_subfolder)
-        with self._build_context():
-            autotools = self._configure_autotools()
-            autotools.install()
-
-        os.unlink(os.path.join(self.package_folder, "lib", "libconfuse.la"))
-        tools.rmdir(os.path.join(self.package_folder, "lib", "pkgconfig"))
-        tools.rmdir(os.path.join(self.package_folder, "share"))
+        copy(self, "LICENSE", src=self.source_folder, dst=os.path.join(self.package_folder, "licenses"))
+        autotools = Autotools(self)
+        # TODO: replace by autotools.install() once https://github.com/conan-io/conan/issues/12153 fixed
+        autotools.install(args=[f"DESTDIR={unix_path(self, self.package_folder)}"])
+        rm(self, "*.la", os.path.join(self.package_folder, "lib"))
+        rmdir(self, os.path.join(self.package_folder, "lib", "pkgconfig"))
+        rmdir(self, os.path.join(self.package_folder, "share"))
+        if is_msvc(self) and self.options.shared:
+            rename(self, os.path.join(self.package_folder, "lib", "confuse.dll.lib"),
+                         os.path.join(self.package_folder, "lib", "confuse.lib"))
+        fix_apple_shared_install_name(self)
 
     def package_info(self):
-        lib = "confuse"
-        if self.settings.os == "Windows" and self.options.shared:
-            lib += ".dll.{}".format("lib" if self.settings.compiler == "Visual Studio" else "a")
-        self.cpp_info.libs = [lib]
-        self.cpp_info.names["pkg_config"] = "libconfuse"
+        self.cpp_info.set_property("pkg_config_name", "libconfuse")
+        self.cpp_info.libs = ["confuse"]
