@@ -53,4 +53,4 @@ It also has Invoke tasks and CI implementations that:
 
 - [`merge-upstream` task](dl-docs/merge-upstream.md)
   - [Automatically Resolved Merge Conflicts](dl-docs/auto-merge-conflict-resolution.md)
-- `merge-staging-to-production` task
+- [`merge-staging-to-production` task](dl-docs/merge-staging-to-production.md)
