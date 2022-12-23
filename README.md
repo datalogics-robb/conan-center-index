@@ -22,20 +22,25 @@ It also has Invoke tasks and CI implementations that:
     - In conjunction with a contribution to `conan-io/conan-center-index`
     - At DL only
   - Datalogics-only modifications to recipes
-- Specifying automatic builds of tools
-  - Configurations for tools
-    - Standard build profiles
-    - Using specific compilers
-  - Specifying which tools to build
-    - Using a dictionary
-      - Limiting which tool configs to use
-      - Specifying options for building the tool
-    - Using version ranges
+- [Specifying automatic builds of tools](dl-docs/automatic-tool-builds.md)
+  - [Configurations for tools](dl-docs/automatic-tool-builds.md#configurations-for-tools)
+    - [Standard build profiles](dl-docs/automatic-tool-builds.md#standard-build-profiles)
+    - [Using specific compilers](dl-docs/automatic-tool-builds.md#using-specific-compilers)
+  - [Specifying which tools to build](dl-docs/automatic-tool-builds.md#specifying-which-tools-to-build)
+    - [Using a dictionary](dl-docs/automatic-tool-builds.md#using-a-dictionary)
+      - [Limiting which tool configs to use](dl-docs/automatic-tool-builds.md#limiting-which-tool-configs-to-use)
+      - [Specifying options for building the tool](dl-docs/automatic-tool-builds.md#specifying-options-for-building-the-tool)
+    - [Using version ranges](dl-docs/automatic-tool-builds.md#using-version-ranges)
+    - [Configurations for tools](dl-docs/automatic-tool-builds.md#configurations-for-tools)
+      - [Standard build profiles](dl-docs/automatic-tool-builds.md#standard-build-profiles)
+      - [Using specific compilers](dl-docs/automatic-tool-builds.md#using-specific-compilers)
+  - [Using version ranges](dl-docs/automatic-tool-builds.md#using-version-ranges)
 - Jenkins jobs
+  - Recipe uploads
+    - Forcing an upload of all recipes
   - Nightly tool builds
     - Requesting a full build
     - Building individual tools
-  - Recipe uploads
   - Merges from `conan-io/conan-center-index` to `develop`
     - Controlling the interval of automated merges
     - Requesting a merge
