@@ -1,13 +1,7 @@
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
 from conan.tools.microsoft import check_min_vs, is_msvc
-from conan.tools.files import (
-    apply_conandata_patches,
-    export_conandata_patches,
-    get,
-    copy,
-    rmdir,
-)
+from conan.tools.files import export_conandata_patches, get, copy, rmdir
 from conan.tools.build import check_min_cppstd
 from conan.tools.scm import Version
 from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
@@ -17,24 +11,13 @@ import os
 required_conan_version = ">=1.53.0"
 
 
-class MBitsArgsConan(ConanFile):
-    name = "mbits-args"
-    description = (
-        "Small open-source library for program argument parser, inspired by Python's `argparse`, "
-        "depending only on the standard library, with C++17 as minimum requirement."
-    )
+class MBitsSemverConan(ConanFile):
+    name = "mbits-semver"
+    description = "Semantic Version type for C++17"
     license = "MIT"
     url = "https://github.com/conan-io/conan-center-index"
-    homepage = "https://github.com/mbits-libs/args"
-    topics = (
-        "command-line",
-        "commandline",
-        "commandline-interface",
-        "program-arguments",
-        "argparse",
-        "argparser",
-        "argument-parsing",
-    )
+    homepage = "https://github.com/mbits-libs/semver"
+    topics = ("semver", "semantic-versioning")
     settings = "os", "compiler", "build_type", "arch"
     options = {"fPIC": [True, False]}
     default_options = {"fPIC": True}
@@ -46,11 +29,11 @@ class MBitsArgsConan(ConanFile):
     @property
     def _compilers_minimum_version(self):
         return {
-            "gcc": "8",
+            "gcc": "11",
             "clang": "12",
             "Visual Studio": "16",
             "msvc": "192",
-            "apple-clang": "10.0",
+            "apple-clang": "11.0.3",
         }
 
     def export_sources(self):
@@ -64,7 +47,7 @@ class MBitsArgsConan(ConanFile):
         cmake_layout(self, src_folder="src")
 
     def validate(self):
-        if self.settings.get_safe("compiler.cppstd"):
+        if self.settings.compiler.cppstd:
             check_min_cppstd(self, self._min_cppstd)
         check_min_vs(self, 192)
         if not is_msvc(self):
@@ -84,12 +67,10 @@ class MBitsArgsConan(ConanFile):
 
     def generate(self):
         tc = CMakeToolchain(self)
-        tc.variables["LIBARGS_TESTING"] = False
-        tc.variables["LIBARGS_INSTALL"] = True
+        tc.variables["SEMVER_TESTING"] = False
         tc.generate()
 
     def build(self):
-        apply_conandata_patches(self)
         cmake = CMake(self)
         cmake.configure()
         cmake.build()
@@ -107,16 +88,16 @@ class MBitsArgsConan(ConanFile):
         rmdir(self, os.path.join(self.package_folder, "lib", "cmake"))
 
     def package_info(self):
-        self.cpp_info.libs = ["args"]
+        self.cpp_info.libs = ["semver"]
 
-        self.cpp_info.set_property("cmake_file_name", "mbits-args")
-        self.cpp_info.set_property("cmake_target_name", "mbits::args")
+        self.cpp_info.set_property("cmake_file_name", "mbits-semver")
+        self.cpp_info.set_property("cmake_target_name", "mbits::semver")
 
-        self.cpp_info.filenames["cmake_find_package"] = "mbits-args"
-        self.cpp_info.filenames["cmake_find_package_multi"] = "mbits-args"
+        self.cpp_info.filenames["cmake_find_package"] = "mbits-semver"
+        self.cpp_info.filenames["cmake_find_package_multi"] = "mbits-semver"
         self.cpp_info.names["cmake_find_package"] = "mbits"
         self.cpp_info.names["cmake_find_package_multi"] = "mbits"
-        self.cpp_info.components["args"].set_property(
-            "cmake_target_name", "mbits::args"
+        self.cpp_info.components["semver"].set_property(
+            "cmake_target_name", "mbits::semver"
         )
-        self.cpp_info.components["args"].libs = ["args"]
+        self.cpp_info.components["semver"].libs = ["semver"]
