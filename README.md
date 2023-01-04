@@ -14,9 +14,9 @@ It also has Invoke tasks and CI implementations that:
 
 ### Configuration and daily operations
 
-- Using the Curated Conan Center Index Conan repositories
-  - Building against the staging repository
-  - Using standard build profiles
+- [Using the Curated Conan Center Index Conan repositories](dl-docs/using-the-ccci-repositories.md)
+  - [Building against the staging repository](dl-docs/using-the-ccci-repositories.md#building-against-the-staging-repository)
+  - [Using standard build profiles](dl-docs/using-the-ccci-repositories.md#using-standard-build-profiles)
 - Updating a recipe
   - Adding a new version of a package
     - In conjunction with a contribution to `conan-io/conan-center-index`
