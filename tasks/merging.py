@@ -121,6 +121,10 @@ class Config:
         with open('dlproject.yaml', encoding='utf-8') as dlproject_file:
             dlproject = yaml.safe_load(dlproject_file)
         config_data = dlproject.get(cls.yaml_key, {})
+        # If dlproject.yaml has an empty key, then the config_data will be None,
+        # and it won't get replaced by the empty dict. Check for that.
+        if config_data is None:
+            config_data = {}
         try:
             return dacite.from_dict(data_class=cls,
                                     data=config_data,
