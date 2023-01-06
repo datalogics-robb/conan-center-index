@@ -190,6 +190,7 @@ config:
         # else the entry can be a dictionary of package name and options
         prebuilt_tools:
             - cmake/[>=3.23.0]
+            - cmake/3.24.3
             - doxygen/1.9.1
             - doxygen/1.9.2
             - package: doxygen/1.9.1
@@ -253,6 +254,7 @@ config:
         # If the entry is a string, it's taken to be the package name,
         # else the entry can be a dictionary of package name and options
         prebuilt_tools:
+            - cmake/3.24.3
             - cmake/[>=3.23.0]
             - doxygen/1.9.1
             - doxygen/1.9.2
@@ -333,6 +335,7 @@ config:
                     - build_type=Debug
         prebuilt_tools: &redhat6Tools
             - package: cmake/[>=3.23.0]
+            - package: cmake/3.24.3
             - package: doxygen/1.9.1
             - package: doxygen/1.9.2
             - package: doxygen/1.9.1
@@ -392,6 +395,7 @@ config:
                     - build_type=Debug
         prebuilt_tools:
             - cmake/[>=3.23.0]
+            - cmake/3.24.3
             - doxygen/1.9.1
             - doxygen/1.9.2
             - package: doxygen/1.9.1
@@ -477,6 +481,7 @@ config:
             default: *windowsDebug
         prebuilt_tools:
             - cmake/[>=3.23.0]
+            - cmake/3.24.3
             - package: doxygen/1.9.1
               configs:
                 # xapian-core doesn't work for cross-building x86_64 to x86
@@ -557,6 +562,11 @@ config:
                 include:
                     - Debug32
         prebuilt_tools:
+            - package: cmake/3.24.3
+              options:
+                - cmake:with_openssl=False
+              configs:
+                - ReleaseTool
             - package: cmake/[>=3.23.0]
               options:
                 - cmake:with_openssl=False
@@ -646,6 +656,9 @@ config:
                 settings:
                     - build_type=Debug
         prebuilt_tools:
+            - package: cmake/3.24.3
+              options:
+                - cmake:with_openssl=False
             - package: cmake/[>=3.23.0]
               options:
                 - cmake:with_openssl=False
