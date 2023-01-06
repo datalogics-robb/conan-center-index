@@ -17,11 +17,12 @@ It also has Invoke tasks and CI implementations that:
 - [Using the Curated Conan Center Index Conan repositories](dl-docs/using-the-ccci-repositories.md)
   - [Building against the staging repository](dl-docs/using-the-ccci-repositories.md#building-against-the-staging-repository)
   - [Using standard build profiles](dl-docs/using-the-ccci-repositories.md#using-standard-build-profiles)
-- Updating a recipe
-  - Adding a new version of a package
-    - In conjunction with a contribution to `conan-io/conan-center-index`
-    - At DL only
-  - Datalogics-only modifications to recipes
+- [Updating a recipe](dl-docs/updating-a-recipe.md)
+  - [Adding a new revision of a recipe](dl-docs/updating-a-recipe.md#adding-a-new-revision-of-a-recipe)
+    - [In conjunction with a contribution to `conan-io/conan-center-index`](dl-docs/updating-a-recipe.md#in-conjunction-with-a-contribution-to-conan-ioconan-center-index)
+    - [At DL only](dl-docs/updating-a-recipe.md#at-dl-only)
+  - [Testing the updated recipe with DL projects](dl-docs/updating-a-recipe.md#testing-the-updated-recipe-with-dl-projects)
+  - [Bringing updates to production](dl-docs/updating-a-recipe.md#bringing-updates-to-production)
 - [Specifying automatic builds of tools](dl-docs/automatic-tool-builds.md)
   - [Configurations for tools](dl-docs/automatic-tool-builds.md#configurations-for-tools)
     - [Standard build profiles](dl-docs/automatic-tool-builds.md#standard-build-profiles)
