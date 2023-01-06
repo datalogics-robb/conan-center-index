@@ -36,16 +36,18 @@ It also has Invoke tasks and CI implementations that:
       - [Standard build profiles](dl-docs/automatic-tool-builds.md#standard-build-profiles)
       - [Using specific compilers](dl-docs/automatic-tool-builds.md#using-specific-compilers)
   - [Using version ranges](dl-docs/automatic-tool-builds.md#using-version-ranges)
-- Jenkins jobs
-  - Recipe uploads
-    - Forcing an upload of all recipes
-  - Nightly tool builds
-    - Requesting a full build
-    - Building individual tools
-  - Merges from `conan-io/conan-center-index` to `develop`
-    - Controlling the interval of automated merges
-    - Requesting a merge
-  - Merging `develop` to `master` to put recipes into production
+- [Jenkins jobs](dl-docs/jenkins-jobs.md)
+  - [Recipe uploads](dl-docs/jenkins-jobs.md#recipe-uploads)
+    - [Forcing an upload of all recipes](dl-docs/jenkins-jobs.md#forcing-an-upload-of-all-recipes)
+  - [Nightly tool builds](dl-docs/jenkins-jobs.md#nightly-tool-builds)
+    - [Requesting a full rebuild](dl-docs/jenkins-jobs.md#requesting-a-full-rebuild)
+    - [Building individual tools](dl-docs/jenkins-jobs.md#building-individual-tools)
+  - [Merges from `conan-io/conan-center-index` to `develop`](dl-docs/jenkins-jobs.md#merges-from-conan-ioconan-center-index-to-develop)
+    - [Controlling the interval of automated merges](dl-docs/jenkins-jobs.md#controlling-the-interval-of-automated-merges)
+    - [Requesting a merge](dl-docs/jenkins-jobs.md#requesting-a-merge)
+  - [Merging `develop` to `master` to put recipes into production](dl-docs/jenkins-jobs.md#merging-develop-to-master-to-put-recipes-into-production)
+    - [Criteria](dl-docs/jenkins-jobs.md#criteria)
+    - [Performing the merge](dl-docs/jenkins-jobs.md#performing-the-merge)
 
 ### Troubleshooting
 
