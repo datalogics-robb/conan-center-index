@@ -11,7 +11,7 @@ conflicts.
 <!-- mdformat-toc start --slug=github --no-anchors --maxlevel=6 --minlevel=2 -->
 
 - [Files that both conan-io and Datalogics modify](#files-that-both-conan-io-and-datalogics-modify)
-  - [Why `.gitattributes-merge` and not `.gitattributes`?](#why-gitattributes-merge-and-not-gitattributes)
+  - [Why `.gitattributes-merge` and not `.gitattributes`](#why-gitattributes-merge-and-not-gitattributes)
   - [Verifying the coverage of `.gitattributes-merge`](#verifying-the-coverage-of-gitattributes-merge)
 - [Files that Datalogics has deleted](#files-that-datalogics-has-deleted)
 - [References](#references)
@@ -36,7 +36,7 @@ As an example, this file currently contains:
 /.github/** merge=ours
 ```
 
-### Why `.gitattributes-merge` and not `.gitattributes`?
+### Why `.gitattributes-merge` and not `.gitattributes`
 
 It's not possible to use custom merge drivers on GitHub, so if the `merge=ours`
 attributes were put into the `.gitattributes` file, it would cause problems with

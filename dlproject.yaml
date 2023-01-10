@@ -543,6 +543,8 @@ config:
                 description: AIX Release
                 profile_host: build-profile-aix-ppc
             ReleaseToolGCC:
+                <<: *aixCommon
+                build_folder: build-release-tool
                 build_folder: build-release-tool
                 description: AIX Release Tool with GCC
                 profile_host: build-profile-aix-ppc-gcc
