@@ -12,6 +12,7 @@ solutions to common problems.
   - [Finding the list of available builders](#finding-the-list-of-available-builders)
   - [Building a specific tool](#building-a-specific-tool)
 - [Resolving merge conflicts from the upstream repo](#resolving-merge-conflicts-from-the-upstream-repo)
+  - [Resolving merge conflicts locally](#resolving-merge-conflicts-locally)
 
 <!-- mdformat-toc end -->
 
@@ -159,3 +160,83 @@ $ conan create recipes/doxygen/all doxygen/1.9.2@ --update --profile:host build-
 strings.
 
 ## Resolving merge conflicts from the upstream repo
+
+Most of the time, the
+[automated merges](jenkins-jobs.md#merges-from-conan-ioconan-center-index-to-develop)
+work without incident, as they fetch from `conan-io/conan-center-index` and
+[resolve merge conflicts automatically](auto-merge-conflict-resolution.md).
+
+Sometimes, in the rare case that Datalogics has a local modification to a
+recipe, and `conan-io` makes a change in the same bit of code, there will be a
+merge conflict.
+
+When that happens, the automated merging will give up, and instead create a pull
+request containing the changes from `conan-io`. It will assign the pull request
+and request reviews from the Octocat users mentioned in the `reviewers` and
+`assignee` keys in the `pull_requests` key of `merge_upstream` as seen in the
+[configuration documentation](merge-upstream.md#configuration).
+
+To resolve the conflict, open the pull request, and then follow the instructions
+in
+[Resolving a merge conflict on GitHub](https://docs.github.com/en/enterprise-server@3.7/pull-requests/collaborating-with-pull-requests/addressing-merge-conflicts/resolving-a-merge-conflict-on-github)
+in the GitHub documentation. Often, you will be able to edit the conflicts right
+on Octocat using the web.
+
+### Resolving merge conflicts locally
+
+If you can't resolve the conflicts in the web editor, then resolve them locally.
+I will illustrate this with commands that assume that you've installed the
+[GitHub CLI](https://cli.github.com/), which supplies the `gh` command.
+
+If you haven't done so already, make sure you're authorized with Octocat:
+
+```shell
+gh auth login -h octocat.dlogics.com -p ssh
+```
+
+If you haven't done so already, fork the `conan-center-index` repo on Octocat.
+
+If you have a checkout of your fork with `upstream` set to the Datalogics repo,
+you can skip this step, otherwise:
+
+```shell
+gh repo clone octocat.dlogics.com/your-user-id/conan-center-index
+cd conan-center-index
+```
+
+Make sure all the remotes are up to date
+
+```shell
+git remote update
+```
+
+Get the master branch from `conan-io`
+
+```shell
+git fetch https://github.com/conan-io/conan-center-index.git master
+```
+
+Create a branch for doing the merge
+
+```shell
+git checkout -b merge-from-conan-io FETCH_HEAD
+```
+
+Merge the `develop` branch
+
+```shell
+git pull --no-ff upstream develop
+```
+
+At this point, resolve any merge conflicts, add the resolutions with `git add`
+and commit with `git commit`.
+
+Then, open a pull request:
+
+```bash
+gh --repo octocat.dlogics.com/datalogics/conan-center-index pr create --web
+```
+
+`gh` will ask where to push; select your own fork and press RETURN.
+
+Your web browser will open. Complete the pull request in the web browser.
