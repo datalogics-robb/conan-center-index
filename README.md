@@ -51,11 +51,11 @@ It also has Invoke tasks and CI implementations that:
 
 ### Troubleshooting
 
-- Analyzing build failures
-- Using pytest to run the tools builders
-- Resolving merge conflicts from the upstream repo
-- Requesting a full build of the tools and their requirements
-- Requesting a full (non-incremental) recipe upload
+- [Analyzing build failures](dl-docs/troubleshooting.md#analyzing-build-failures)
+- [Using pytest to run the tools builders](dl-docs/troubleshooting.md#using-pytest-to-run-the-tools-builders)
+- [Resolving merge conflicts from the upstream repo](dl-docs/troubleshooting.md#resolving-merge-conflicts-from-the-upstream-repo)
+- [Requesting a full build of the tools and their requirements](dl-docs/jenkins-jobs.md#requesting-a-full-rebuild)
+- [Requesting a full (non-incremental) recipe upload](dl-docs/jenkins-jobs.md#forcing-an-upload-of-all-recipes)
 
 ### Reference
 
