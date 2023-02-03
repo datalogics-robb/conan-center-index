@@ -2,6 +2,7 @@ from conans import ConanFile, CMake
 from conan.tools.build import cross_building
 import os
 
+
 class TestPackageV1Conan(ConanFile):
     settings = "os", "arch", "compiler", "build_type"
     generators = "cmake", "cmake_find_package_multi"
