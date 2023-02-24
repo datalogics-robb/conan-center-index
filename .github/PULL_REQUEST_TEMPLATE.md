@@ -1,7 +1,7 @@
 - _List changes here_
 -
 
-#### Fulfills JIRA issue [EXAMPLE-1](https://jira.datalogics.com/browse/EXAMPLE-1)
+#### Fulfills JIRA issue [EXAMPLE-1](https://datalogics-jira.atlassian.net/browse/EXAMPLE-1)
 
 #### Checklist for approving this pull request
 
