@@ -295,6 +295,20 @@ config:
                 description: RedHat Debug
                 settings:
                     - build_type=Debug
+            Release32: &redhatRelease32
+                <<: *redhatCommon
+                build_folder: build-release-32
+                description: RedHat Release 32
+                profile_host:
+                    - llvm-toolset-7-cppstd-14
+                settings:
+                    - arch=x86
+            Debug32: &redhatDebug32
+                <<: *redhatRelease32
+                build_folder: build-debug-32
+                description: RedHat Debug 32
+                settings:
+                    - build_type=Debug
             ReleaseTool: &redhatReleaseTool
                 <<: *redhatCommon
                 build_folder: build-release-tool
@@ -415,6 +429,18 @@ config:
                 description: Windows Debug
                 settings:
                     - build_type=Debug
+            Release32:
+                include: Release
+                build_folder: build-release-32
+                description: Windows Release 32
+                settings:
+                    - arch=x86
+            Debug32:
+                include: Release32
+                build_folder: build-debug-32
+                description: Windows Debug 32
+                settings:
+                    - build_type=Debug
             ReleaseTool:
                 build_folder: build-release-tool
                 description: Windows Release
@@ -472,6 +498,17 @@ config:
                 <<: *aixRelease
                 build_folder: build-debug
                 description: AIX Debug
+                settings:
+                    - build_type=Debug
+            Release32: &aixRelease32
+                <<: *aixRelease
+                build_folder: build-release-32
+                description: AIX Release 32
+                profile_host: gcc-8-aix71-32
+            Debug32: &aixDebug32
+                <<: *aixRelease32
+                build_folder: build-debug-32
+                description: AIX Debug 32
                 settings:
                     - build_type=Debug
             ReleaseTool:
@@ -549,6 +586,17 @@ config:
                 <<: *sparcRelease
                 build_folder: build-debug
                 description: Sparc Debug
+                settings:
+                    - build_type=Debug
+            Release32: &sparcRelease32
+                <<: *sparcRelease
+                build_folder: build-release-32
+                description: Sparc Release 32
+                profile_host: gcc-9-sparc32-solaris
+            Debug32: &sparcDebug32
+                <<: *sparcRelease32
+                build_folder: build-debug-32
+                description: Sparc Debug 32
                 settings:
                     - build_type=Debug
             ReleaseTool:
