@@ -165,6 +165,9 @@ fields in the dictionary are:
   requirements of the tool.
 - `configs`: a list of configs to build for the particular tool in question. Any
   config in this list must _also_ be in `prebuilt_tools_configs`.
+- `recipe_from`: A string indicating the directory from which to load the
+  recipe. This can be used to override the search for the recipe directory in
+  `config.yml`, to use an alternate recipe.
 
 #### Limiting which tool configs to use
 

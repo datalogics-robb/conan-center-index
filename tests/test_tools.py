@@ -20,6 +20,7 @@ class Package(NamedTuple):
     package: str
     options: List[str] = list()
     configs: List[str] = list()
+    recipe_from: str = None
 
     def __str__(self):
         result = self.package
@@ -43,7 +44,10 @@ class Package(NamedTuple):
         """Check if the package has a range expression, and resolve it if necessary."""
         package, range = self.package.split('/', maxsplit=1)
         if range.startswith('[') and range.endswith(']'):
-            versions = recipes.versions_to_folders(package).keys()
+            if self.recipe_from:
+                versions = recipes.conandata_versions(self.recipe_from)
+            else:
+                versions = recipes.versions_to_folders(package).keys()
             range = range[1:-1]  # strip off brackets
             # Could call conans.client.graph.range_resolver.satisfying() here, but
             # avoiding using Conan internals. That means not supporting loose or include_prerelease
@@ -54,7 +58,7 @@ class Package(NamedTuple):
                 return self
             resolved_package = f'{package}/{resolved_version}'
             print(f'Resolved {self.package} to {resolved_package}')
-            return Package(resolved_package, self.options, self.configs)
+            return Package(resolved_package, self.options, self.configs, recipe_from=self.recipe_from)
         else:
             return self
 
@@ -94,6 +98,8 @@ def release_tool_config():
 
 @pytest.fixture(scope='package')
 def tool_recipe_folder(prebuilt_tool):
+    if prebuilt_tool.recipe_from:
+        return prebuilt_tool.recipe_from
     package, version = prebuilt_tool.package.split('/')
     return recipes.versions_to_folders(package).get(version)
 
