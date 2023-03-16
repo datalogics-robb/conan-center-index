@@ -189,8 +189,10 @@ config:
         # If the entry is a string, it's taken to be the package name,
         # else the entry can be a dictionary of package name and options
         prebuilt_tools:
-            - cmake/[>=3.23.0]
-            - cmake/[~3.24.0]
+            - package: cmake/[>=3.23.0]
+              recipe_from: recipes/cmake/3.x.x
+            - package: cmake/[~3.24.0]
+              recipe_from: recipes/cmake/3.x.x
             - doxygen/1.9.1
             - doxygen/1.9.2
             - package: doxygen/1.9.1
