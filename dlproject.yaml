@@ -614,9 +614,11 @@ config:
             - package: cmake/[~3.24.0]
               options:
                 - cmake:with_openssl=False
+              recipe_from: recipes/cmake/3.x.x
             - package: cmake/[>=3.23.0]
               options:
                 - cmake:with_openssl=False
+              recipe_from: recipes/cmake/3.x.x
             - package: doxygen/1.9.1
               options:
                   - doxygen:enable_search=False
