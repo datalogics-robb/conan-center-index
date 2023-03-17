@@ -208,7 +208,9 @@ class TestBuildTools(object):
             force_build_options = ['--build', package_name,
                                    '--build', 'missing']
         elif force_build == 'with-requirements':
-            force_build_options = ['--build']
+            force_build_options = ['--build', '*']
+            if package_name != 'cmake':
+                force_build_options += ['--build', '!cmake']
         else:
             force_build_options = ['--build', 'missing']
 
