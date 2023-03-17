@@ -604,7 +604,15 @@ config:
             ReleaseTool:
                 build_folder: build-release-tool
                 description: Sparc Release Tool
-                profile_host: build-profile-solaris-sparc
+                profile_host:
+                    - build-profile-solaris-sparc
+                    - profiles/cmake-tool
+            ReleaseToolCMake:
+                build_folder: build-release-tool
+                description: Sparc Release Tool
+                profile_host:
+                    - build-profile-solaris-sparc
+                    - profiles/bootstrap-cmake-tool
             DebugTool:
                 build_folder: build-debug-tool
                 description: Sparc Debug Tool
@@ -617,25 +625,44 @@ config:
               options:
                 - cmake:with_openssl=False
               recipe_from: recipes/cmake/3.x.x
+              configs:
+                  - ReleaseToolCMake
             - package: cmake/[>=3.23.0]
               options:
                 - cmake:with_openssl=False
               recipe_from: recipes/cmake/3.x.x
+              configs:
+                  - ReleaseToolCMake
             - package: doxygen/1.9.1
               options:
                   - doxygen:enable_search=False
-            - ninja/[~1.10.0]
-            - ninja/[>=1.0.0]
-            - b2/4.8.0
-            - b2/4.9.2
+              configs:
+                  - ReleaseTool
+            - package: ninja/[~1.10.0]
+              configs:
+                  - ReleaseTool
+            - package: ninja/[>=1.0.0]
+              configs:
+                  - ReleaseTool
+            - package: b2/4.8.0
+              configs:
+                  - ReleaseTool
+            - package: b2/4.9.2
+              configs:
+                  - ReleaseTool
             - package: swig/1.3.40+dl.1
               options:
                   - pcre:with_bzip2=False
+              configs:
+                  - ReleaseTool
             - package: swig/4.0.2+dl.2
               options:
                   - pcre:with_bzip2=False
+              configs:
+                  - ReleaseTool
         prebuilt_tools_configs:
             - ReleaseTool
+            - ReleaseToolCMake
 
     byhost:
         # Configs based on hostname.
