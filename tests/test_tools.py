@@ -1,4 +1,5 @@
 import collections.abc
+import itertools
 import json
 import os
 import platform
@@ -63,19 +64,6 @@ class Package(NamedTuple):
             return self
 
 
-@pytest.fixture(scope='package',
-                params=[Package.create_resolved(entry) for entry in _config.get('prebuilt_tools', [])],
-                ids=lambda param: str(param))
-def prebuilt_tool(request):
-    return request.param
-
-
-@pytest.fixture(scope='package',
-                params=_config.get('prebuilt_tools_configs', []))
-def prebuilt_tool_config_name(request):
-    return request.param
-
-
 def config_from_name(config_name):
     config = Config.from_name(config_name)
     config.validate()
@@ -86,9 +74,32 @@ def config_from_name(config_name):
     return config
 
 
-@pytest.fixture(scope='package')
-def prebuilt_tool_config(prebuilt_tool_config_name):
-    return config_from_name(prebuilt_tool_config_name)
+class ConfiguredPackage(NamedTuple):
+    """A configured package, combining the package with its configuration"""
+    package: Package
+    config_name: str
+    config: Config
+
+    def __str__(self):
+        return f'{self.package}-{self.config_name}'
+
+
+def _tools_and_configs():
+    """Return tuples of prebuilt_tool, config, and config_name, by taking the Cartesian product
+     of the tools and configs, and filtering out the configs that don't apply."""
+    prebuilt_tools = (Package.create_resolved(entry) for entry in _config.get('prebuilt_tools', []))
+    configs = ((config_name, config_from_name(config_name)) for config_name in
+               _config.get('prebuilt_tools_configs', []))
+    return [ConfiguredPackage(tool, config_name, config)
+            for tool, (config_name, config) in itertools.product(prebuilt_tools, configs)
+            if not tool.configs or config_name in tool.configs]
+
+
+@pytest.fixture(scope='package',
+                params=_tools_and_configs(),
+                ids=lambda param: str(param))
+def tool_and_config(request):
+    return request.param
 
 
 @pytest.fixture(scope='package')
@@ -97,7 +108,8 @@ def release_tool_config():
 
 
 @pytest.fixture(scope='package')
-def tool_recipe_folder(prebuilt_tool):
+def tool_recipe_folder(tool_and_config):
+    prebuilt_tool = tool_and_config.package
     if prebuilt_tool.recipe_from:
         return prebuilt_tool.recipe_from
     package, version = prebuilt_tool.package.split('/')
@@ -177,11 +189,9 @@ class TestBuildTools(object):
         assert 'packages' in items, 'there should have been an package list in the first item'
         return items['packages']
 
-    def test_build_tool(self, prebuilt_tool, prebuilt_tool_config_name, prebuilt_tool_config, tool_recipe_folder,
-                        upload_to, force_build, tmp_path, conan_env):
-        if prebuilt_tool.configs and prebuilt_tool_config_name not in prebuilt_tool.configs:
-            pytest.skip(f'Skipping build because config named {prebuilt_tool_config_name} is not in the list of '
-                        f'configs for this package: {", ".join(prebuilt_tool.configs)}')
+    def test_build_tool(self, tool_and_config, tool_recipe_folder, upload_to, force_build, tmp_path, conan_env):
+        prebuilt_tool = tool_and_config.package
+        prebuilt_tool_config = tool_and_config.config
 
         package_name, package_version = prebuilt_tool.package.split('/', maxsplit=1)
         assert not package_version.startswith('[') and not package_version.endswith(']'), 'version range must have ' \
