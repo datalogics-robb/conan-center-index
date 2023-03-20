@@ -321,18 +321,6 @@ config:
                 description: RedHat Debug Tool
                 settings:
                     - build_type=Debug
-            ReleaseTool32: &redhatReleaseTool32
-                include: ReleaseTool
-                build_folder: build-release-tool-32
-                description: RedHat Release Tool 32
-                settings:
-                    - arch=x86
-            DebugTool32: &redhatDebugTool32
-                include: ReleaseTool32
-                build_folder: build-debug-tool-32
-                description: RedHat Debug Tool 32
-                settings:
-                    - build_type=Debug
         prebuilt_tools: &redhat6Tools
             - package: cmake/[>=3.23.0]
             - package: cmake/3.24.3
@@ -464,20 +452,6 @@ config:
                     - ReleaseTool
                 settings:
                     - build-type=Debug
-            ReleaseTool32:
-                build_folder: build-release-32-tool
-                description: Windows Release 32 Tool
-                include:
-                    - ReleaseTool
-                settings:
-                    - arch=x86
-            DebugTool32:
-                build_folder: build-debug-32-tool
-                description: Windows Debug 32 Tool
-                include:
-                    - ReleaseTool32
-                settings:
-                    - build-type=Debug
             default: *windowsDebug
         prebuilt_tools:
             - cmake/[>=3.23.0]
@@ -553,16 +527,6 @@ config:
                 description: AIX Debug Tool
                 include:
                     - Debug
-            ReleaseTool32:
-                build_folder: build-release-tool-32
-                description: AIX Release 32 Tool 32
-                include:
-                    - Release32
-            DebugTool32:
-                build_folder: build-debug-tool-32
-                description: AIX Debug 32 Tool
-                include:
-                    - Debug32
         prebuilt_tools:
             - package: cmake/3.24.3
               options:
@@ -644,17 +608,6 @@ config:
                 description: Sparc Debug Tool
                 include:
                     - ReleaseTool
-                settings:
-                    - build_type=Debug
-            ReleaseTool32:
-                build_folder: build-release-tool-32
-                description: Sparc Release 32 Tool 32
-                profile_host: build-profile-solaris-sparc-32
-            DebugTool32:
-                build_folder: build-debug-tool-32
-                description: Sparc Debug 32 Tool
-                include:
-                    - DebugTool32
                 settings:
                     - build_type=Debug
         prebuilt_tools:
