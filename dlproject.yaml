@@ -190,9 +190,7 @@ config:
         # else the entry can be a dictionary of package name and options
         prebuilt_tools:
             - package: cmake/[>=3.23.0]
-              recipe_from: recipes/cmake/3.x.x
             - package: cmake/[~3.24.0]
-              recipe_from: recipes/cmake/3.x.x
             - doxygen/1.9.1
             - doxygen/1.9.2
             - package: doxygen/1.9.1
@@ -624,13 +622,11 @@ config:
             - package: cmake/[~3.24.0]
               options:
                 - cmake:with_openssl=False
-              recipe_from: recipes/cmake/3.x.x
               configs:
                   - ReleaseToolCMake
             - package: cmake/[>=3.23.0]
               options:
                 - cmake:with_openssl=False
-              recipe_from: recipes/cmake/3.x.x
               configs:
                   - ReleaseToolCMake
             - package: doxygen/1.9.1
