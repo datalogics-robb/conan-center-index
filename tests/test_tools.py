@@ -198,6 +198,12 @@ class TestBuildTools(object):
                                                                                           'been resolved'
         assert tool_recipe_folder is not None, 'the recipe folder must be found'
 
+        # To prevent problems with test_package build directory detritus interfering with the tests,
+        # clean the recipe directory before running conan create
+        args = ['git', 'clean', '-fdx', tool_recipe_folder]
+        print(f'Cleaning recipe directory {tool_recipe_folder}...')
+        subprocess.run(args, check=True, env=conan_env)
+
         tool_options = []
         for opt in prebuilt_tool.options:
             tool_options.append('--options:host')
