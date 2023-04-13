@@ -10,6 +10,8 @@
     - [Limiting which tool configs to use](#limiting-which-tool-configs-to-use)
     - [Specifying options for building the tool](#specifying-options-for-building-the-tool)
   - [Using version ranges](#using-version-ranges)
+- [Using CMake in tool builds](#using-cmake-in-tool-builds)
+  - [Bootstrap CMake](#bootstrap-cmake)
 
 <!-- mdformat-toc end -->
 
@@ -165,6 +167,9 @@ fields in the dictionary are:
   requirements of the tool.
 - `configs`: a list of configs to build for the particular tool in question. Any
   config in this list must _also_ be in `prebuilt_tools_configs`.
+- `recipe_from`: A string indicating the directory from which to load the
+  recipe. This can be used to override the search for the recipe directory in
+  `config.yml`, to use an alternate recipe.
 
 #### Limiting which tool configs to use
 
@@ -213,3 +218,85 @@ the latest CMake after 3.23 is built, this `dlproject.yaml` has entries like:
 
 Although the tool builder will only build the latest version that matches the
 range, previous versions are still left in the Conan repository on Artifactory.
+
+## Using CMake in tool builds
+
+CMake is necessary for some tool builds, but it is difficult to build,
+especially if there isn't already a CMake available. There are two solutions for
+this
+
+- [PR 16503](https://github.com/conan-io/conan-center-index/pull/16503) at
+  conan-io/conan-center-index changed the CMake recipe to use prebuilt binaries
+  for macOS, Windows, and Linux. CMake never has to be built, but it's good to
+  have it available for use by recipes.
+- We build CMake for platforms like Solaris, but to build CMake, you need to
+  have a CMake. For this, we make a special bootstrap version of CMake that we
+  can use to build other CMake versions.
+
+### Bootstrap CMake
+
+In order to build CMake, it works best if you already have CMake.
+
+We modified the CMake recipe so that it's possible to change the name of the
+CMake recipe by using the `CMAKE_RECIPE_NAME` environment variable. We make a
+CMake called `bootstrap_cmake`, using an existing CMake built with an older
+recipe. That CMake had been built when we had CMake 3.19 on Solaris.
+
+That new `bootstrap_cmake` will replace the requirement to have CMake installed
+to build CMake.
+
+Start on Solaris, with a Git checkout, an activated Python environment,
+`DL_CONAN_CENTER_INDEX=staging` and Conan set up with `invoke conan.login`.
+
+Then, we find a CMake that has a Solaris version, by searching each Conan
+package:
+
+```commandline
+$ conan search -r conan-center-dl-staging cmake/3.24.2@ -q os=SunOS
+Existing packages for recipe cmake/3.24.2:
+
+Existing recipe in remote 'conan-center-dl-staging':
+
+    Package_ID: 301073fa7576e04654a8a15ea81bef9149ea57e4
+        [options]
+            bootstrap: False
+            with_openssl: False
+        [settings]
+            arch: sparcv9
+            build_type: Release
+            os: SunOS
+        Outdated from recipe: False
+```
+
+Install CMake with Conan, using the Solaris build profile and a virtualenv
+generator:
+
+```commandline
+$ conan install -if cmake cmake/3.24.2@ -pr build-profile-solaris-sparc -g virtualenv
+```
+
+Build a recent CMake with the `bootstrap_cmake` recipe name, using the
+virtualenv from the installed CMake above.
+
+```commandline
+$ (. ./cmake/activate.sh && env CMAKE_RECIPE_NAME=bootstrap_cmake conan create recipes/cmake/combined \
+    bootstrap_cmake/3.25.3@ -pr build-profile-solaris-sparc \
+    -o 'bootstrap_cmake/*:from_sources=True' -o 'bootstrap_cmake/*:with_openssl=False' \
+    --build missing)
+```
+
+...and upload it:
+
+```commandline
+conan upload -r conan-center-dl-staging bootstrap_cmake/3.25.3@ --all
+```
+
+Activate it and check the version:
+
+```commandline
+$ . ./cmake/activate.sh
+$ cmake --version
+cmake version 3.24.2
+
+CMake suite maintained and supported by Kitware (kitware.com/cmake).
+```

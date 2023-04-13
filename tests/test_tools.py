@@ -1,4 +1,5 @@
 import collections.abc
+import itertools
 import json
 import os
 import platform
@@ -20,6 +21,7 @@ class Package(NamedTuple):
     package: str
     options: List[str] = list()
     configs: List[str] = list()
+    recipe_from: str = None
 
     def __str__(self):
         result = self.package
@@ -43,7 +45,10 @@ class Package(NamedTuple):
         """Check if the package has a range expression, and resolve it if necessary."""
         package, range = self.package.split('/', maxsplit=1)
         if range.startswith('[') and range.endswith(']'):
-            versions = recipes.versions_to_folders(package).keys()
+            if self.recipe_from:
+                versions = recipes.conandata_versions(self.recipe_from)
+            else:
+                versions = recipes.versions_to_folders(package).keys()
             range = range[1:-1]  # strip off brackets
             # Could call conans.client.graph.range_resolver.satisfying() here, but
             # avoiding using Conan internals. That means not supporting loose or include_prerelease
@@ -54,22 +59,9 @@ class Package(NamedTuple):
                 return self
             resolved_package = f'{package}/{resolved_version}'
             print(f'Resolved {self.package} to {resolved_package}')
-            return Package(resolved_package, self.options, self.configs)
+            return Package(resolved_package, self.options, self.configs, recipe_from=self.recipe_from)
         else:
             return self
-
-
-@pytest.fixture(scope='package',
-                params=[Package.create_resolved(entry) for entry in _config.get('prebuilt_tools', [])],
-                ids=lambda param: str(param))
-def prebuilt_tool(request):
-    return request.param
-
-
-@pytest.fixture(scope='package',
-                params=_config.get('prebuilt_tools_configs', []))
-def prebuilt_tool_config_name(request):
-    return request.param
 
 
 def config_from_name(config_name):
@@ -82,9 +74,32 @@ def config_from_name(config_name):
     return config
 
 
-@pytest.fixture(scope='package')
-def prebuilt_tool_config(prebuilt_tool_config_name):
-    return config_from_name(prebuilt_tool_config_name)
+class ConfiguredPackage(NamedTuple):
+    """A configured package, combining the package with its configuration"""
+    package: Package
+    config_name: str
+    config: Config
+
+    def __str__(self):
+        return f'{self.package}-{self.config_name}'
+
+
+def _tools_and_configs():
+    """Return tuples of prebuilt_tool, config, and config_name, by taking the Cartesian product
+     of the tools and configs, and filtering out the configs that don't apply."""
+    prebuilt_tools = (Package.create_resolved(entry) for entry in _config.get('prebuilt_tools', []))
+    configs = ((config_name, config_from_name(config_name)) for config_name in
+               _config.get('prebuilt_tools_configs', []))
+    return [ConfiguredPackage(tool, config_name, config)
+            for tool, (config_name, config) in itertools.product(prebuilt_tools, configs)
+            if not tool.configs or config_name in tool.configs]
+
+
+@pytest.fixture(scope='package',
+                params=_tools_and_configs(),
+                ids=lambda param: str(param))
+def tool_and_config(request):
+    return request.param
 
 
 @pytest.fixture(scope='package')
@@ -93,7 +108,10 @@ def release_tool_config():
 
 
 @pytest.fixture(scope='package')
-def tool_recipe_folder(prebuilt_tool):
+def tool_recipe_folder(tool_and_config):
+    prebuilt_tool = tool_and_config.package
+    if prebuilt_tool.recipe_from:
+        return prebuilt_tool.recipe_from
     package, version = prebuilt_tool.package.split('/')
     return recipes.versions_to_folders(package).get(version)
 
@@ -171,16 +189,20 @@ class TestBuildTools(object):
         assert 'packages' in items, 'there should have been an package list in the first item'
         return items['packages']
 
-    def test_build_tool(self, prebuilt_tool, prebuilt_tool_config_name, prebuilt_tool_config, tool_recipe_folder,
-                        upload_to, force_build, tmp_path, conan_env):
-        if prebuilt_tool.configs and prebuilt_tool_config_name not in prebuilt_tool.configs:
-            pytest.skip(f'Skipping build because config named {prebuilt_tool_config_name} is not in the list of '
-                        f'configs for this package: {", ".join(prebuilt_tool.configs)}')
+    def test_build_tool(self, tool_and_config, tool_recipe_folder, upload_to, force_build, tmp_path, conan_env):
+        prebuilt_tool = tool_and_config.package
+        prebuilt_tool_config = tool_and_config.config
 
         package_name, package_version = prebuilt_tool.package.split('/', maxsplit=1)
         assert not package_version.startswith('[') and not package_version.endswith(']'), 'version range must have ' \
                                                                                           'been resolved'
         assert tool_recipe_folder is not None, 'the recipe folder must be found'
+
+        # To prevent problems with test_package build directory detritus interfering with the tests,
+        # clean the recipe directory before running conan create
+        args = ['git', 'clean', '-fdx', tool_recipe_folder]
+        print(f'Cleaning recipe directory {tool_recipe_folder}...')
+        subprocess.run(args, check=True, env=conan_env)
 
         tool_options = []
         for opt in prebuilt_tool.options:
@@ -192,7 +214,9 @@ class TestBuildTools(object):
             force_build_options = ['--build', package_name,
                                    '--build', 'missing']
         elif force_build == 'with-requirements':
-            force_build_options = ['--build']
+            force_build_options = ['--build', '*']
+            if package_name != 'cmake':
+                force_build_options += ['--build', '!cmake']
         else:
             force_build_options = ['--build', 'missing']
 

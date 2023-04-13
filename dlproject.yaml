@@ -179,6 +179,13 @@ config:
                 description: macOS Release
                 profile_host:
                     - build-profile-macos-intel
+                    - profiles/cmake-tool
+            ReleaseToolCMake:
+                <<: *macOSCommon
+                build_folder: build-release
+                description: macOS Release
+                profile_host:
+                    - build-profile-macos-intel
             DebugTool: &macOSDebugTool
                 include:
                     - ReleaseTool
@@ -189,20 +196,40 @@ config:
         # If the entry is a string, it's taken to be the package name,
         # else the entry can be a dictionary of package name and options
         prebuilt_tools:
-            - cmake/[>=3.23.0]
-            - cmake/[~3.24.0]
-            - doxygen/1.9.1
-            - doxygen/1.9.2
+            - package: cmake/[>=3.23.0]
+              configs:
+                  - ReleaseToolCMake
+            - package: cmake/[~3.24.0]
+              configs:
+                  - ReleaseToolCMake
+            - package: doxygen/1.9.1
+              configs:
+                  - ReleaseTool
+            - package: doxygen/1.9.2
+              configs:
+                  - ReleaseTool
             - package: doxygen/1.9.1
               options:
                   - doxygen:enable_search=False
+              configs:
+                  - ReleaseTool
             - package: doxygen/1.9.2
               options:
                   - doxygen:enable_search=False
-            - ninja/[~1.10.0]
-            - ninja/[>=1.0.0]
-            - b2/4.8.0
-            - b2/4.9.2
+              configs:
+                  - ReleaseTool
+            - package: ninja/[~1.10.0]
+              configs:
+                  - ReleaseTool
+            - package: ninja/[>=1.0.0]
+              configs:
+                  - ReleaseTool
+            - package: b2/4.8.0
+              configs:
+                  - ReleaseTool
+            - package: b2/4.9.2
+              configs:
+                  - ReleaseTool
             # Here, and afterward, building pcre without bzip2, because DLE
             # sets that option in its conanfile.py. Currently, the only
             # tool being built that uses bzip2 or pcre is SWIG.
@@ -210,11 +237,16 @@ config:
             - package: swig/1.3.40+dl.1
               options:
                   - pcre:with_bzip2=False
+              configs:
+                  - ReleaseTool
             - package: swig/4.0.2+dl.2
               options:
                   - pcre:with_bzip2=False
+              configs:
+                  - ReleaseTool
         prebuilt_tools_configs:
             - ReleaseTool
+            - ReleaseToolCMake
 
 
     macos-arm64:
@@ -244,6 +276,13 @@ config:
                 description: macOS Release
                 profile_host:
                     - build-profile-macos-arm
+                    - profiles/cmake-tool
+            ReleaseToolCMake:
+                <<: *macOSCommon
+                build_folder: build-release
+                description: macOS Release
+                profile_host:
+                    - build-profile-macos-arm
             DebugTool:
                 include:
                     - ReleaseTool
@@ -254,28 +293,53 @@ config:
         # If the entry is a string, it's taken to be the package name,
         # else the entry can be a dictionary of package name and options
         prebuilt_tools:
-            - cmake/[~3.24.0]
-            - cmake/[>=3.23.0]
-            - doxygen/1.9.1
-            - doxygen/1.9.2
+            - package: cmake/[~3.24.0]
+              configs:
+                  - ReleaseToolCMake
+            - package: cmake/[>=3.23.0]
+              configs:
+                  - ReleaseToolCMake
+            - package: doxygen/1.9.1
+              configs:
+                  - ReleaseTool
+            - package: doxygen/1.9.2
+              configs:
+                  - ReleaseTool
             - package: doxygen/1.9.1
               options:
                   - doxygen:enable_search=False
+              configs:
+                  - ReleaseTool
             - package: doxygen/1.9.2
               options:
                   - doxygen:enable_search=False
-            - ninja/[~1.10.0]
-            - ninja/[>=1.0.0]
-            - b2/4.8.0
-            - b2/4.9.2
+              configs:
+                  - ReleaseTool
+            - package: ninja/[~1.10.0]
+              configs:
+                  - ReleaseTool
+            - package: ninja/[>=1.0.0]
+              configs:
+                  - ReleaseTool
+            - package: b2/4.8.0
+              configs:
+                  - ReleaseTool
+            - package: b2/4.9.2
+              configs:
+                  - ReleaseTool
             - package: swig/1.3.40+dl.1
               options:
                   - pcre:with_bzip2=False
+              configs:
+                  - ReleaseTool
             - package: swig/4.0.2+dl.2
               options:
                   - pcre:with_bzip2=False
+              configs:
+                  - ReleaseTool
         prebuilt_tools_configs:
             - ReleaseTool
+            - ReleaseToolCMake
 
 
     redhat-6-x86_64:
@@ -315,6 +379,13 @@ config:
                 description: RedHat Release Tool
                 profile_host:
                     - build-profile-linux-intel
+                    - profiles/cmake-tool
+            ReleaseToolCMake:
+                <<: *redhatCommon
+                build_folder: build-release-tool
+                description: RedHat Release Tool
+                profile_host:
+                    - build-profile-linux-intel
             DebugTool: &redhatDebugTool
                 include: ReleaseTool
                 build_folder: build-debug-tool
@@ -323,24 +394,46 @@ config:
                     - build_type=Debug
         prebuilt_tools: &redhat6Tools
             - package: cmake/[>=3.23.0]
+              configs:
+                  - ReleaseToolCMake
             - package: cmake/[~3.24.0]
+              configs:
+                  - ReleaseToolCMake
             - package: doxygen/1.9.1
+              configs:
+                  - ReleaseTool
             - package: doxygen/1.9.2
+              configs:
+                  - ReleaseTool
             - package: doxygen/1.9.1
               options:
                   - doxygen:enable_search=False
+              configs:
+                  - ReleaseTool
             - package: doxygen/1.9.2
               options:
                   - doxygen:enable_search=False
+              configs:
+                  - ReleaseTool
             - package: ninja/[~1.10.0]
-            - b2/4.8.0
-            - b2/4.9.2
+              configs:
+                  - ReleaseTool
+            - package: b2/4.8.0
+              configs:
+                  - ReleaseTool
+            - package: b2/4.9.2
+              configs:
+                  - ReleaseTool
             - package: swig/1.3.40+dl.1
               options:
                   - pcre:with_bzip2=False
+              configs:
+                  - ReleaseTool
             - package: swig/4.0.2+dl.2
               options:
                   - pcre:with_bzip2=False
+              configs:
+                  - ReleaseTool
         prebuilt_tools_configs:
             # Build 64-bit tools on RHEL 6, because they're used for 64-bit DLE for APDFL 15
             - ReleaseTool
@@ -348,7 +441,9 @@ config:
     redhat-7-x86_64:
         config: *redhat6Config
         prebuilt_tools:
-            - ninja/[>=1.0.0]
+            - package: ninja/[>=1.0.0]
+              configs:
+                  - ReleaseTool
         prebuilt_tools_configs:
             - ReleaseTool
 
@@ -374,6 +469,12 @@ config:
                 description: RedHat Release
                 profile_host:
                     - build-profile-linux-arm
+                    - profiles/cmake-tool
+            ReleaseToolCMake:
+                build_folder: build-release-tool
+                description: RedHat Release
+                profile_host:
+                    - build-profile-linux-arm
             DebugTool:
                 build_folder: build-debug-tool
                 description: RedHat Debug
@@ -382,28 +483,53 @@ config:
                 settings:
                     - build_type=Debug
         prebuilt_tools:
-            - cmake/[>=3.23.0]
-            - cmake/[~3.24.0]
-            - doxygen/1.9.1
-            - doxygen/1.9.2
+            - package: cmake/[>=3.23.0]
+              configs:
+                  - ReleaseToolCMake
+            - package: cmake/[~3.24.0]
+              configs:
+                  - ReleaseToolCMake
+            - package: doxygen/1.9.1
+              configs:
+                  - ReleaseTool
+            - package: doxygen/1.9.2
+              configs:
+                  - ReleaseTool
             - package: doxygen/1.9.1
               options:
                   - doxygen:enable_search=False
+              configs:
+                  - ReleaseTool
             - package: doxygen/1.9.2
               options:
                   - doxygen:enable_search=False
-            - ninja/[~1.10.0]
-            - ninja/[>=1.0.0]
-            - b2/4.8.0
-            - b2/4.9.2
+              configs:
+                  - ReleaseTool
+            - package: ninja/[~1.10.0]
+              configs:
+                  - ReleaseTool
+            - package: ninja/[>=1.0.0]
+              configs:
+                  - ReleaseTool
+            - package: b2/4.8.0
+              configs:
+                  - ReleaseTool
+            - package: b2/4.9.2
+              configs:
+                  - ReleaseTool
             - package: swig/1.3.40+dl.1
               options:
                   - pcre:with_bzip2=False
+              configs:
+                  - ReleaseTool
             - package: swig/4.0.2+dl.2
               options:
                   - pcre:with_bzip2=False
+              configs:
+                  - ReleaseTool
         prebuilt_tools_configs:
             - ReleaseTool
+            - ReleaseToolCMake
 
     windows:
         # Can set the generator differently on a per-machine basis (but automatic is
@@ -444,7 +570,14 @@ config:
             ReleaseTool:
                 build_folder: build-release-tool
                 description: Windows Release
-                profile_host: build-profile-windows-intel
+                profile_host:
+                    - build-profile-windows-intel
+                    - profiles/cmake-tool
+            ReleaseToolCMake:
+                build_folder: build-release-tool
+                description: Windows Release
+                profile_host:
+                    - build-profile-windows-intel
             DebugTool:
                 build_folder: build-debug-tool
                 description: Windows Debug Tool
@@ -454,8 +587,12 @@ config:
                     - build-type=Debug
             default: *windowsDebug
         prebuilt_tools:
-            - cmake/[>=3.23.0]
-            - cmake/[~3.24.0]
+            - package: cmake/[>=3.23.0]
+              configs:
+                  - ReleaseToolCMake
+            - package: cmake/[~3.24.0]
+              configs:
+                  - ReleaseToolCMake
             - package: doxygen/1.9.1
               configs:
                 # xapian-core doesn't work for cross-building x86_64 to x86
@@ -467,22 +604,41 @@ config:
             - package: doxygen/1.9.1
               options:
                   - doxygen:enable_search=False
+              configs:
+                  - ReleaseTool
             - package: doxygen/1.9.2
               options:
                   - doxygen:enable_search=False
-            - ninja/[~1.10.0]
-            - ninja/[>=1.0.0]
-            - b2/4.8.0
-            - b2/4.9.2
+              configs:
+                  - ReleaseTool
+            - package: ninja/[~1.10.0]
+              configs:
+                  - ReleaseTool
+            - package: ninja/[>=1.0.0]
+              configs:
+                  - ReleaseTool
+            - package: b2/4.8.0
+              configs:
+                  - ReleaseTool
+            - package: b2/4.9.2
+              configs:
+                  - ReleaseTool
             - package: swig/1.3.40+dl.1
               options:
                   - pcre:with_bzip2=False
+              configs:
+                  - ReleaseTool
             - package: swig/4.0.2+dl.2
               options:
                   - pcre:with_bzip2=False
-            - innoextract/1.9.0
+              configs:
+                  - ReleaseTool
+            - package: innoextract/1.9.0
+              configs:
+                  - ReleaseTool
         prebuilt_tools_configs:
             - ReleaseTool
+            - ReleaseToolCMake
 
     aix:
         common: &aixCommon
@@ -602,7 +758,15 @@ config:
             ReleaseTool:
                 build_folder: build-release-tool
                 description: Sparc Release Tool
-                profile_host: build-profile-solaris-sparc
+                profile_host:
+                    - build-profile-solaris-sparc
+                    - profiles/cmake-tool
+            ReleaseToolCMake:
+                build_folder: build-release-tool
+                description: Sparc Release Tool
+                profile_host:
+                    - build-profile-solaris-sparc
+                    - profiles/bootstrap-cmake-tool
             DebugTool:
                 build_folder: build-debug-tool
                 description: Sparc Debug Tool
@@ -614,24 +778,43 @@ config:
             - package: cmake/[~3.24.0]
               options:
                 - cmake:with_openssl=False
+              configs:
+                  - ReleaseToolCMake
             - package: cmake/[>=3.23.0]
               options:
                 - cmake:with_openssl=False
+              configs:
+                  - ReleaseToolCMake
             - package: doxygen/1.9.1
               options:
                   - doxygen:enable_search=False
-            - ninja/[~1.10.0]
-            - ninja/[>=1.0.0]
-            - b2/4.8.0
-            - b2/4.9.2
+              configs:
+                  - ReleaseTool
+            - package: ninja/[~1.10.0]
+              configs:
+                  - ReleaseTool
+            - package: ninja/[>=1.0.0]
+              configs:
+                  - ReleaseTool
+            - package: b2/4.8.0
+              configs:
+                  - ReleaseTool
+            - package: b2/4.9.2
+              configs:
+                  - ReleaseTool
             - package: swig/1.3.40+dl.1
               options:
                   - pcre:with_bzip2=False
+              configs:
+                  - ReleaseTool
             - package: swig/4.0.2+dl.2
               options:
                   - pcre:with_bzip2=False
+              configs:
+                  - ReleaseTool
         prebuilt_tools_configs:
             - ReleaseTool
+            - ReleaseToolCMake
 
     byhost:
         # Configs based on hostname.
