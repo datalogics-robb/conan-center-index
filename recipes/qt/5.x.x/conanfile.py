@@ -1,5 +1,6 @@
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
+from conan.tools.android import android_abi
 from conan.tools.apple import is_apple_os
 from conan.tools.build import build_jobs, check_min_cppstd, cross_building
 from conan.tools.env import Environment, VirtualBuildEnv, VirtualRunEnv
@@ -14,7 +15,7 @@ import os
 import textwrap
 import shutil
 
-required_conan_version = ">=1.52.0"
+required_conan_version = ">=1.59.0"
 
 
 class QtConan(ConanFile):
@@ -69,6 +70,7 @@ class QtConan(ConanFile):
         "gui": [True, False],
         "widgets": [True, False],
 
+        "android_sdk": [None, "ANY"],
         "device": [None, "ANY"],
         "cross_compile": [None, "ANY"],
         "sysroot": [None, "ANY"],
@@ -111,6 +113,7 @@ class QtConan(ConanFile):
         "gui": True,
         "widgets": True,
 
+        "android_sdk": None,
         "device": None,
         "cross_compile": None,
         "sysroot": None,
@@ -225,6 +228,9 @@ class QtConan(ConanFile):
         if self.settings.os != "Macos":
             del self.options.qtmacextras
 
+        if self.settings.os != "Android":
+            del self.options.android_sdk
+
     def configure(self):
         # if self.settings.os != "Linux":
         #         self.options.with_libiconv = False # QTBUG-84708
@@ -313,8 +319,11 @@ class QtConan(ConanFile):
             if self.settings.compiler == "gcc" and Version(self.settings.compiler.version) < "5":
                 raise ConanInvalidConfiguration("Compiling Qt WebEngine with gcc < 5 is not supported")
 
-        if self.settings.os == "Android" and self.options.get_safe("opengl", "no") == "desktop":
-            raise ConanInvalidConfiguration("OpenGL desktop is not supported on Android. Consider using OpenGL es2")
+        if self.settings.os == "Android":
+            if self.options.get_safe("opengl", "no") == "desktop":
+                raise ConanInvalidConfiguration("OpenGL desktop is not supported on Android. Consider using OpenGL es2")
+            if not self.options.get_safe("android_sdk", ""):
+                raise ConanInvalidConfiguration("Path to Android SDK is required to build Qt")
 
         if self.settings.os != "Windows" and self.options.get_safe("opengl", "no") == "dynamic":
             raise ConanInvalidConfiguration("Dynamic OpenGL is supported only on Windows.")
@@ -349,7 +358,7 @@ class QtConan(ConanFile):
         if self.options.get_safe("qtwayland", False) and not self.dependencies.direct_host["xkbcommon"].options.with_wayland:
             raise ConanInvalidConfiguration("The 'with_wayland' option for the 'xkbcommon' package must be enabled when the 'qtwayland' option is enabled")
 
-        if cross_building(self) and self.options.cross_compile == "None" and not is_apple_os(self):
+        if cross_building(self) and self.options.cross_compile == "None" and not is_apple_os(self) and self.settings.os != "Android":
             raise ConanInvalidConfiguration("option cross_compile must be set for cross compilation "
                                             "cf https://doc.qt.io/qt-5/configure-options.html#cross-compilation-options")
 
@@ -375,11 +384,11 @@ class QtConan(ConanFile):
         if self.options.get_safe("with_freetype", False) and not self.options.multiconfiguration:
             self.requires("freetype/2.13.0")
         if self.options.get_safe("with_fontconfig", False):
-            self.requires("fontconfig/2.13.93")
+            self.requires("fontconfig/2.14.2")
         if self.options.get_safe("with_icu", False):
             self.requires("icu/72.1")
         if self.options.get_safe("with_harfbuzz", False) and not self.options.multiconfiguration:
-            self.requires("harfbuzz/6.0.0")
+            self.requires("harfbuzz/7.1.0")
         if self.options.get_safe("with_libjpeg", False) and not self.options.multiconfiguration:
             if self.options.with_libjpeg == "libjpeg-turbo":
                 self.requires("libjpeg-turbo/2.1.5")
@@ -465,6 +474,8 @@ class QtConan(ConanFile):
         if self._settings_build.os == "Macos":
             save(self, "bash_env", 'export DYLD_LIBRARY_PATH="%s"' % env.vars(self).get("DYLD_LIBRARY_PATH"))
             env.define_path("BASH_ENV", os.path.abspath("bash_env"))
+        envvars = env.vars(self)
+        envvars.save_script("my_env_file")
 
     def _make_program(self):
         if is_msvc(self):
@@ -727,16 +738,15 @@ class QtConan(ConanFile):
                 args.append('QMAKE_APPLE_DEVICE_ARCHS="arm64"')
         elif self.settings.os == "Android":
             args += [f"-android-ndk-platform android-{self.settings.os.api_level}"]
-            args += ["-android-abis %s" % {"armv7": "armeabi-v7a",
-                                           "armv8": "arm64-v8a",
-                                           "x86": "x86",
-                                           "x86_64": "x86_64"}.get(str(self.settings.arch))]
+            args += [f"-android-abis {android_abi(self)}"]
 
         if self.settings.get_safe("compiler.libcxx") == "libstdc++":
             args += ["-D_GLIBCXX_USE_CXX11_ABI=0"]
         elif self.settings.get_safe("compiler.libcxx") == "libstdc++11":
             args += ["-D_GLIBCXX_USE_CXX11_ABI=1"]
 
+        if self.options.get_safe("android_sdk", ""):
+            args += [f"-android-sdk {self.options.android_sdk}"]
         if self.options.sysroot:
             args += [f"-sysroot {self.options.sysroot}"]
 
@@ -941,6 +951,8 @@ Examples = bin/datadir/examples""")
                     self.info.settings.compiler.runtime = "MT/MTd"
             else:
                 self.info.settings.compiler.runtime_type = "Release/Debug"
+        if self.info.settings.os == "Android":
+            del self.info.options.android_sdk
 
     def package_info(self):
         self.cpp_info.set_property("cmake_file_name", "Qt5")
@@ -958,6 +970,8 @@ Examples = bin/datadir/examples""")
             self.cpp_info.components[component].build_modules["cmake_find_package_multi"].append(module)
 
         libsuffix = ""
+        if self.settings.os == "Android":
+            libsuffix = f"_{android_abi(self)}"
         if not self.options.multiconfiguration:
             if self.settings.build_type == "Debug":
                 if self.settings.os == "Windows" and is_msvc(self):
@@ -1430,8 +1444,9 @@ Examples = bin/datadir/examples""")
                     self.cpp_info.components["qtNetwork"].frameworks.append("GSS")
                 if not self.options.openssl: # with SecureTransport
                     self.cpp_info.components["qtNetwork"].frameworks.append("Security")
-            if self.settings.os == "Macos":
+            if self.settings.os == "Macos" or (self.settings.os == "iOS" and Version(self.settings.compiler.version) >= "14.0"):
                 self.cpp_info.components["qtCore"].frameworks.append("IOKit")     # qtcore requires "_IORegistryEntryCreateCFProperty", "_IOServiceGetMatchingService" and much more which are in "IOKit" framework
+            if self.settings.os == "Macos":
                 self.cpp_info.components["qtCore"].frameworks.append("Cocoa")     # qtcore requires "_OBJC_CLASS_$_NSApplication" and more, which are in "Cocoa" framework
                 self.cpp_info.components["qtCore"].frameworks.append("Security")  # qtcore requires "_SecRequirementCreateWithString" and more, which are in "Security" framework
 
