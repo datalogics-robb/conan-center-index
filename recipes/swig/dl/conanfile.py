@@ -175,6 +175,14 @@ class SwigConan(ConanFile):
         bindir = os.path.join(self.package_folder, "bin")
         self.output.info("Appending PATH environment variable: {}".format(bindir))
         self.env_info.PATH.append(bindir)
+        if self.settings.os in ['AIX', 'SunOS']:
+            # On these platforms, SWIG can't find its own location with dladdr()
+            # See exclusions on patch: 0001-swig-linux-library-path.patch
+            # To make the test_package and other programs work, set SWIG_LIB
+            swig_libdir = os.path.join(self.package_folder, "bin", "swiglib")
+            self.output.info("Setting SWIG_LIB environment variable: {}".format(swig_libdir))
+            self.env_info.SWIG_LIB = swig_libdir
+
 
     def package_id(self):
         del self.info.settings.compiler
