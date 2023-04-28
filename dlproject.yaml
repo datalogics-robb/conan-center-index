@@ -227,7 +227,7 @@ config:
             - package: b2/4.8.0
               configs:
                   - ReleaseTool
-            - package: b2/4.9.2
+            - package: b2/4.9.3
               configs:
                   - ReleaseTool
             - package: b2/4.9.6
@@ -330,7 +330,7 @@ config:
             - package: b2/4.8.0
               configs:
                   - ReleaseTool
-            - package: b2/4.9.2
+            - package: b2/4.9.3
               configs:
                   - ReleaseTool
             - package: b2/4.9.6
@@ -433,7 +433,7 @@ config:
             - package: b2/4.8.0
               configs:
                   - ReleaseTool
-            - package: b2/4.9.2
+            - package: b2/4.9.3
               configs:
                   - ReleaseTool
             - package: b2/4.9.6
@@ -532,7 +532,7 @@ config:
             - package: b2/4.8.0
               configs:
                   - ReleaseTool
-            - package: b2/4.9.2
+            - package: b2/4.9.3
               configs:
                   - ReleaseTool
             - package: b2/4.9.6
@@ -644,7 +644,7 @@ config:
             - package: b2/4.8.0
               configs:
                   - ReleaseTool
-            - package: b2/4.9.2
+            - package: b2/4.9.3
               configs:
                   - ReleaseTool
             - package: b2/4.9.6
@@ -739,7 +739,7 @@ config:
             - package: b2/4.8.0
               configs:
                 - ReleaseToolGCC
-            - package: b2/4.9.2
+            - package: b2/4.9.3
               configs:
                 - ReleaseToolGCC
             - package: b2/4.9.6
@@ -835,7 +835,7 @@ config:
             - package: b2/4.8.0
               configs:
                   - ReleaseTool
-            - package: b2/4.9.2
+            - package: b2/4.9.3
               configs:
                   - ReleaseTool
             - package: b2/4.9.6
