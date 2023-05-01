@@ -866,8 +866,8 @@ merge_upstream:
     # Overrides the defaults in the MergeUpstreamConfig class in tasks/merge_upstream.py
     # Note the use of nested dataclasses; use nested dictionaries here.
     pull_request:
-        reviewers: [ kam ]
-        assignee: kam
+        reviewers: [ kam, saharay ]
+        assignee: saharay
     # Defaults:
     #    cci:
     #        url: git@github.com:conan-io/conan-center-index.git
