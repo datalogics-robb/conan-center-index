@@ -678,7 +678,7 @@ config:
                 <<: *aixCommon
                 build_folder: build-release
                 description: AIX Release
-                profile_host: gcc-8-aix71-64
+                profile_host: gcc-10-aix72-64
             Debug: &aixDebug
                 <<: *aixRelease
                 build_folder: build-debug
@@ -689,7 +689,7 @@ config:
                 <<: *aixRelease
                 build_folder: build-release-32
                 description: AIX Release 32
-                profile_host: gcc-8-aix71-32
+                profile_host: gcc-10-aix72-32
             Debug32: &aixDebug32
                 <<: *aixRelease32
                 build_folder: build-debug-32
