@@ -1,11 +1,11 @@
+from conans import ConanFile, CMake
+from conan.tools.build import cross_building
 import os
 
-from conan.tools.build import cross_building
-from conans import CMake, ConanFile
 
-
-class TestPackageConan(ConanFile):
-    settings = "arch", "build_type", "compiler", "os"
+# legacy validation with Conan 1.x
+class TestPackageV1Conan(ConanFile):
+    settings = "os", "arch", "compiler", "build_type"
     generators = "cmake", "cmake_find_package_multi"
 
     def build(self):
