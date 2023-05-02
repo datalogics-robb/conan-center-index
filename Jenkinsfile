@@ -53,9 +53,18 @@ pipeline {
         }
     }
     triggers {
-        // From the doc: @midnight actually means some time between 12:00 AM and 2:59 AM.
+        // From the doc: H(0-59) H(0-2) means some time between 12:00 AM and 2:59 AM.
         // This gives us automatic spreading out of jobs, so they don't cause load spikes.
-        parameterizedCron(env.BRANCH_NAME =~ 'develop' ? '@midnight % MERGE_UPSTREAM=true' : '@midnight')
+        // See Syntax: https://www.jenkins.io/doc/book/pipeline/syntax/#cron-syntax
+        // Note: Due to the when statement, MERGE_UPSTREAM only works on the develop branch, so
+        // it doesn't have to be conditionalized here.
+        // Randomly between 12:00AM and 2:59, run the job. On Sunday through Friday (0-5), just run the
+        // job. On Saturday (6), use the MERGE_UPSTREAM=true parameter, which merges upstream if the
+        // branch is develop
+        parameterizedCron('''
+            H(0-59) H(0-2) * * 0-5
+            H(0-59) H(0-2) * * 6 % MERGE_UPSTREAM=true
+        ''')
     }
     environment {
         CONAN_USER_HOME = "${WORKSPACE}"
