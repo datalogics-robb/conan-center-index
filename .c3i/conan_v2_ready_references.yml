@@ -1,4 +1,5 @@
 required_for_references:
+- 7bitdi
 - aaf
 - aaplus
 - abseil
@@ -7,6 +8,7 @@ required_for_references:
 - ada
 - ade
 - aeron
+- aggeom-agg
 - alac
 - alpaca
 - amgcl
@@ -74,6 +76,7 @@ required_for_references:
 - brigand
 - brotli
 - brynet
+- bshoshany-thread-pool
 - bullet3
 - butteraugli
 - bvdberg-ctest
@@ -245,6 +248,7 @@ required_for_references:
 - ghc-filesystem
 - giflib
 - ginkgo
+- gklib
 - glad
 - glfw
 - gli
@@ -258,11 +262,13 @@ required_for_references:
 - gnutls
 - googleapis
 - gperf
+- graphene
 - grpc
 - grpc-proto
 - gsl
 - gsl-lite
 - gsoap
+- gstreamer
 - gtest
 - gtk
 - gurkenlaeufer
@@ -310,6 +316,7 @@ required_for_references:
 - lexbor
 - libalsa
 - libarchive
+- libassert
 - libatomic_ops
 - libattr
 - libbacktrace
@@ -346,6 +353,7 @@ required_for_references:
 - liblsl
 - libltc
 - liblzf
+- libmad
 - libmikmod
 - libmodbus
 - libmodplug
@@ -410,11 +418,13 @@ required_for_references:
 - lua
 - luau
 - lz4
+- lzma_sdk
 - m4
 - magic_enum
 - make
 - mariadb-connector-c
 - matchit
+- mawk
 - mbedtls
 - md4c
 - md4qt
@@ -423,6 +433,7 @@ required_for_references:
 - mgs
 - mikelankamp-fpm
 - mimalloc
+- miniaudio
 - minisat
 - minizip
 - minizip-ng
@@ -433,6 +444,7 @@ required_for_references:
 - msgpack-c
 - msgpack-cxx
 - msys2
+- naive-tsearch
 - namedtype
 - nameof
 - nanoflann
@@ -500,6 +512,7 @@ required_for_references:
 - pybind11
 - qhull
 - qpdf
+- quantlib
 - quill
 - quirc
 - rabbitmq-c
@@ -514,6 +527,7 @@ required_for_references:
 - readerwriterqueue
 - readline
 - readosm
+- rectpack2d
 - restbed
 - restinio
 - roaring
@@ -521,8 +535,10 @@ required_for_references:
 - rttr
 - ruy
 - s2n
+- samurai
 - scnlib
 - screen_capture_lite
+- sdbus-cpp
 - sdl
 - sdl_image
 - seadex-essentials
@@ -534,6 +550,8 @@ required_for_references:
 - sigslot
 - simdjson
 - simdutf
+- skyr-url
+- sml
 - snappy
 - soci
 - sophus
@@ -580,6 +598,7 @@ required_for_references:
 - uriparser
 - utf8proc
 - utfcpp
+- uvw
 - vaapi
 - variant-lite
 - vdpau
