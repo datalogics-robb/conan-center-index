@@ -10,7 +10,6 @@ config:
         # The config_args are passed to the 'git clone' command and can select
         # a branch or tag
         config_url: git@octocat.dlogics.com:datalogics/conan-config.git
-        config_args: --branch curated-conan-center-index
 
         # Conan profile that's used to configure the compiler
         # default is the profile Conan makes in the user's home directory
