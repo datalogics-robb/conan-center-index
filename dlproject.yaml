@@ -685,17 +685,6 @@ config:
                 description: AIX Debug
                 settings:
                     - build_type=Debug
-            Release32: &aixRelease32
-                <<: *aixRelease
-                build_folder: build-release-32
-                description: AIX Release 32
-                profile_host: gcc-10-aix72-32
-            Debug32: &aixDebug32
-                <<: *aixRelease32
-                build_folder: build-debug-32
-                description: AIX Debug 32
-                settings:
-                    - build_type=Debug
             ReleaseToolGCC:
                 <<: *aixCommon
                 build_folder: build-release-tool
@@ -708,30 +697,10 @@ config:
                 include:
                     - Debug
         prebuilt_tools:
-            - package: cmake/[~3.24.0]
-              options:
-                - cmake:with_openssl=False
-            - package: cmake/[>=3.23.0]
-              options:
-                - cmake:with_openssl=False
-            - package: doxygen/1.9.1
-              options:
-                  - doxygen:enable_search=False
-            - package: doxygen/1.9.2
-              options:
-                  - doxygen:enable_search=False
-            - package: ninja/[~1.10.0]
-            - package: ninja/[>=1.0.0]
             - package: b2/4.8.0
             - package: b2/4.9.3
             - package: b2/4.9.6
             - package: b2/[~4.9]
-            - package: swig/1.3.40+dl.1
-              options:
-                  - pcre:with_bzip2=False
-            - package: swig/4.0.2+dl.2
-              options:
-                  - pcre:with_bzip2=False
         prebuilt_tools_configs:
             - ReleaseToolGCC
 
