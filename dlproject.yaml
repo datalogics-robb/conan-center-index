@@ -165,7 +165,7 @@ config:
                 build_folder: build-release
                 description: macOS Release
                 profile_host:
-                    - apple-clang-13.0-intel-cppstd-14
+                    - apple-clang-14.0-intel-cppstd-14
             Debug: &macOSDebug
                 <<: *macOSRelease
                 build_folder: build
@@ -262,7 +262,7 @@ config:
                 build_folder: build-release
                 description: macOS Release
                 profile_host:
-                    - apple-clang-13.0-arm-cppstd-14
+                    - apple-clang-14.0-arm-cppstd-14
             Debug:
                 <<: *macOSRelease
                 build_folder: build
@@ -666,35 +666,27 @@ config:
                 <<: *aixCommon
                 build_folder: build-release
                 description: AIX Release
-                profile_host: gcc-8-aix71-64
+                profile_host: gcc-10-aix72-64-cppstd-14
+                env_host:
+                    - PATH=[/opt/cmake-3.23/bin]
             Debug: &aixDebug
                 <<: *aixRelease
                 build_folder: build-debug
                 description: AIX Debug
                 settings:
                     - build_type=Debug
-            Release32: &aixRelease32
-                <<: *aixRelease
-                build_folder: build-release-32
-                description: AIX Release 32
-                profile_host: gcc-8-aix71-32
-            Debug32: &aixDebug32
-                <<: *aixRelease32
-                build_folder: build-debug-32
-                description: AIX Debug 32
-                settings:
-                    - build_type=Debug
             ReleaseTool:
                 <<: *aixCommon
                 build_folder: build-release-tool
                 description: AIX Release
-                profile_host: build-profile-aix-ppc
-            ReleaseToolGCC:
-                <<: *aixCommon
+                profile_host: gcc-10-aix72-64-cppstd-14
+                profile_build: gcc-10-aix72-64-cppstd-14
+           ReleaseToolCMake:
                 build_folder: build-release-tool
-                build_folder: build-release-tool
-                description: AIX Release Tool with GCC
-                profile_host: build-profile-aix-ppc-gcc
+                description: AIX CMake Release Tool
+                profile_host:
+                    - gcc-10-aix72-64-cppstd-14
+                    - profiles/bootstrap-cmake-tool
             DebugTool:
                 build_folder: build-debug-tool
                 description: AIX Debug Tool
@@ -705,18 +697,12 @@ config:
               options:
                 - cmake:with_openssl=False
               configs:
-                - ReleaseTool
+                  - ReleaseToolCMake
             - package: cmake/[>=3.23.0]
               options:
                 - cmake:with_openssl=False
               configs:
-                - ReleaseTool
-            - package: doxygen/1.9.1
-              options:
-                  - doxygen:enable_search=False
-            - package: doxygen/1.9.2
-              options:
-                  - doxygen:enable_search=False
+                - ReleaseToolCMake
             - package: ninja/[~1.10.0]
               configs:
                 - ReleaseTool
@@ -725,29 +711,18 @@ config:
                 - ReleaseTool
             - package: b2/4.8.0
               configs:
-                - ReleaseToolGCC
+                - ReleaseTool
             - package: b2/4.9.3
               configs:
-                - ReleaseToolGCC
+                - ReleaseTool
             - package: b2/4.9.6
               configs:
-                  - ReleaseToolGCC
+                  - ReleaseTool
             - package: b2/[~4.9]
               configs:
-                  - ReleaseToolGCC
-            - package: swig/1.3.40+dl.1
-              options:
-                  - pcre:with_bzip2=False
-              configs:
-                - ReleaseTool
-            - package: swig/4.0.2+dl.2
-              options:
-                  - pcre:with_bzip2=False
-              configs:
-                - ReleaseTool
+                  - ReleaseTool
         prebuilt_tools_configs:
             - ReleaseTool
-            - ReleaseToolGCC
 
     sunos:
         common: &sparcCommon
@@ -760,7 +735,7 @@ config:
                 description: Sparc Release
                 profile_host: gcc-9-sparc-solaris
                 env_host:
-                    - PATH=[/opt/cmake-3.19/bin]
+                    - PATH=[/opt/cmake-3.23/bin]
             Debug: &sparcDebug
                 <<: *sparcRelease
                 build_folder: build-debug
