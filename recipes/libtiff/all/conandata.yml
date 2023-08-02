@@ -16,9 +16,15 @@ patches:
     - patch_file: "patches/4.5.1-0001-cmake-dependencies.patch"
       patch_description: "CMake: robust handling of dependencies"
       patch_type: "conan"
+    - patch_file: "patches/dl-tif-getimage.patch"
+      patch_description: "Support CMYK conversions."
+      patch_type: "conan"
   "4.5.0":
     - patch_file: "patches/4.5.0-0001-cmake-dependencies.patch"
       patch_description: "CMake: robust handling of dependencies"
+      patch_type: "conan"
+    - patch_file: "patches/dl-tif-getimage.patch"
+      patch_description: "Support CMYK conversions."
       patch_type: "conan"
   "4.4.0":
     - patch_file: "patches/4.4.0-0001-cmake-dependencies.patch"
