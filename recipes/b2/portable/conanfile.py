@@ -143,6 +143,7 @@ class B2Conan(ConanFile):
             if cxx:
                 command += f" --cxx={cxx}"
             cxxflags = os.environ.get("CXXFLAGS")
+
             if cxxflags:
                 command += f" --cxxflags={cxxflags}"
 
