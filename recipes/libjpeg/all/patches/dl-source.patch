@@ -861,7 +861,7 @@ diff -u -N -a -r a/jphotoshop.h b/jphotoshop.h
 diff -u -N -a -r a/makefile.vc b/makefile.vc
 --- a/makefile.vc	2021-11-18 08:55:36.000000000 -0600
 +++ b/makefile.vc	2023-01-03 20:45:09.000000000 -0600
-@@ -42,12 +42,12 @@
+@@ -43,12 +39,12 @@
          jddctmgr.c jdhuff.c jdinput.c jdmainct.c jdmarker.c jdmaster.c \
          jdmerge.c jdpostct.c jdsample.c jdtrans.c jerror.c jfdctflt.c \
          jfdctfst.c jfdctint.c jidctflt.c jidctfst.c jidctint.c jquant1.c \
@@ -876,7 +876,7 @@ diff -u -N -a -r a/makefile.vc b/makefile.vc
          rdtarga.c wrtarga.c rdbmp.c wrbmp.c rdrle.c wrrle.c
  SOURCES= $(LIBSOURCES) $(SYSDEPSOURCES) $(APPSOURCES)
  # files included by source files
-@@ -82,7 +82,8 @@
+@@ -83,7 +83,8 @@
  DISTFILES= $(DOCS) $(MKFILES) $(CONFIGFILES) $(SOURCES) $(INCLUDES) \
          $(CONFIGUREFILES) $(OTHERFILES) $(TESTFILES)
  # library object files common to compression and decompression
@@ -886,7 +886,8 @@ diff -u -N -a -r a/makefile.vc b/makefile.vc
  # compression library object files
  CLIBOBJECTS= jcapimin.obj jcapistd.obj jcarith.obj jctrans.obj jcparam.obj \
          jdatadst.obj jcinit.obj jcmaster.obj jcmarker.obj jcmainct.obj \
-@@ -101,7 +102,7 @@
+@@ -101,7 +101,7 @@
+ COBJECTS= cjpeg.obj rdppm.obj rdgif.obj rdtarga.obj rdrle.obj rdbmp.obj \
          rdswitch.obj cdjpeg.obj
  DOBJECTS= djpeg.obj wrppm.obj wrgif.obj wrtarga.obj wrrle.obj wrbmp.obj \
          rdcolmap.obj cdjpeg.obj
