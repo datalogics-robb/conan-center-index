@@ -886,7 +886,7 @@ diff -u -N -a -r a/makefile.vc b/makefile.vc
  # compression library object files
  CLIBOBJECTS= jcapimin.obj jcapistd.obj jcarith.obj jctrans.obj jcparam.obj \
          jdatadst.obj jcinit.obj jcmaster.obj jcmarker.obj jcmainct.obj \
-@@ -101,7 +101,7 @@
+@@ -101,8 +102,8 @@
  COBJECTS= cjpeg.obj rdppm.obj rdgif.obj rdtarga.obj rdrle.obj rdbmp.obj \
          rdswitch.obj cdjpeg.obj
  DOBJECTS= djpeg.obj wrppm.obj wrgif.obj wrtarga.obj wrrle.obj wrbmp.obj \
