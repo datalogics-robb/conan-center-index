@@ -20,7 +20,7 @@
 +         return NewString(SWIG_LIB);
 +        }
 +
-+        dirname(buffer);
++        strcpy(buffer, dirname(buffer));
 +        strcat(buffer, "/swiglib");
 +        return NewStringWithSize(buffer, strlen(buffer));
 +    }
