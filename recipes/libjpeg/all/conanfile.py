@@ -80,6 +80,7 @@ class LibjpegConan(ConanFile):
             env.generate()
             tc = AutotoolsToolchain(self)
             tc.extra_defines.append("LIBJPEG_BUILDING")
+            tc.configure_args.append("--enable-maxmem=10")
             tc.generate()
 
     def _build_nmake(self):
