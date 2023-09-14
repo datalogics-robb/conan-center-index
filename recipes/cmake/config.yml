@@ -19,3 +19,5 @@ versions:
     folder: "combined"
   "3.27.1":
     folder: "combined"
+  "3.27.4":
+    folder: "combined"
