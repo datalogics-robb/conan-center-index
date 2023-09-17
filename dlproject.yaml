@@ -1,4 +1,4 @@
-# Config file for the project. Used by the Invoke tasks, primarily.
+---
 config:
     # Basic configuration variables
     global:
@@ -80,9 +80,9 @@ config:
                 - MD
                 - MTd
                 - MDd
-            # Set this to False to make the package set up the vcvars before the build.
+            # Set this to false to make the package set up the vcvars before the build.
             # But beware, this can mess up some recipes, especially if toolsets are around.
-            exclude_vcvars_precommand: True
+            exclude_vcvars_precommand: true
             clang_versions:
                 # quirk: must be string
                 - "5.0"
@@ -97,8 +97,8 @@ config:
             #     - stdlibc++
             shared:
                 # Permitted states for the shared option.
-                - True
-                - False
+                - true
+                - false
 
             # Build types. If missing, defaults to Debug and Release.
             # build_types:
@@ -116,15 +116,15 @@ config:
             #     some_setting: "some_value"
 
             # Allow making DLLs with static runtimes.
-            # Normally, that's not done, but set this to True to allow
+            # Normally, that's not done, but set this to true to allow
             # those special cases into the build matrix.
-            dll_with_static_runtime: False
+            dll_with_static_runtime: false
 
-            # Set to True if this is a pure C project
-            pure_c: False
+            # Set to true if this is a pure C project
+            pure_c: false
 
-            # Set to True if this project supports a header_only option
-            header_only: False
+            # Set to true if this project supports a header_only option
+            header_only: false
 
     # Configs based on platform information
     #
@@ -165,7 +165,7 @@ config:
                 build_folder: build-release
                 description: macOS Release
                 profile_host:
-                    - apple-clang-13.0-intel-cppstd-14
+                    - apple-clang-14.0-intel-cppstd-14
             Debug: &macOSDebug
                 <<: *macOSRelease
                 build_folder: build
@@ -262,7 +262,7 @@ config:
                 build_folder: build-release
                 description: macOS Release
                 profile_host:
-                    - apple-clang-13.0-arm-cppstd-14
+                    - apple-clang-14.0-arm-cppstd-14
             Debug:
                 <<: *macOSRelease
                 build_folder: build
@@ -606,12 +606,12 @@ config:
                   - ReleaseToolCMake
             - package: doxygen/1.9.1
               configs:
-                # xapian-core doesn't work for cross-building x86_64 to x86
-                - ReleaseTool
+                  # xapian-core doesn't work for cross-building x86_64 to x86
+                  - ReleaseTool
             - package: doxygen/1.9.2
               configs:
-                # xapian-core doesn't work for cross-building x86_64 to x86
-                - ReleaseTool
+                  # xapian-core doesn't work for cross-building x86_64 to x86
+                  - ReleaseTool
             - package: doxygen/1.9.1
               options:
                   - doxygen:enable_search=False
@@ -666,35 +666,29 @@ config:
                 <<: *aixCommon
                 build_folder: build-release
                 description: AIX Release
-                profile_host: gcc-8-aix71-64
+                profile_host: gcc-10-aix72-64-cppstd-14
+                env_host:
+                    - PATH=[/opt/cmake-3.23/bin]
             Debug: &aixDebug
                 <<: *aixRelease
                 build_folder: build-debug
                 description: AIX Debug
                 settings:
                     - build_type=Debug
-            Release32: &aixRelease32
-                <<: *aixRelease
-                build_folder: build-release-32
-                description: AIX Release 32
-                profile_host: gcc-8-aix71-32
-            Debug32: &aixDebug32
-                <<: *aixRelease32
-                build_folder: build-debug-32
-                description: AIX Debug 32
-                settings:
-                    - build_type=Debug
             ReleaseTool:
                 <<: *aixCommon
                 build_folder: build-release-tool
                 description: AIX Release
-                profile_host: build-profile-aix-ppc
-            ReleaseToolGCC:
-                <<: *aixCommon
+                profile_host:
+                    - gcc-10-aix72-64-cppstd-14
+                profile_build:
+                    - gcc-10-aix72-64-cppstd-14
+            ReleaseToolCMake:
                 build_folder: build-release-tool
-                build_folder: build-release-tool
-                description: AIX Release Tool with GCC
-                profile_host: build-profile-aix-ppc-gcc
+                description: AIX CMake Release Tool
+                profile_host:
+                    - gcc-10-aix72-64-cppstd-14
+                    - profiles/bootstrap-cmake-tool
             DebugTool:
                 build_folder: build-debug-tool
                 description: AIX Debug Tool
@@ -703,51 +697,34 @@ config:
         prebuilt_tools:
             - package: cmake/[~3.24.0]
               options:
-                - cmake:with_openssl=False
+                  - cmake:with_openssl=False
               configs:
-                - ReleaseTool
+                  - ReleaseToolCMake
             - package: cmake/[>=3.23.0]
               options:
-                - cmake:with_openssl=False
+                  - cmake:with_openssl=False
               configs:
-                - ReleaseTool
-            - package: doxygen/1.9.1
-              options:
-                  - doxygen:enable_search=False
-            - package: doxygen/1.9.2
-              options:
-                  - doxygen:enable_search=False
+                  - ReleaseToolCMake
             - package: ninja/[~1.10.0]
               configs:
-                - ReleaseTool
+                  - ReleaseTool
             - package: ninja/[>=1.0.0]
               configs:
-                - ReleaseTool
+                  - ReleaseTool
             - package: b2/4.8.0
               configs:
-                - ReleaseToolGCC
+                  - ReleaseTool
             - package: b2/4.9.3
               configs:
-                - ReleaseToolGCC
+                  - ReleaseTool
             - package: b2/4.9.6
               configs:
-                  - ReleaseToolGCC
+                  - ReleaseTool
             - package: b2/[~4.9]
               configs:
-                  - ReleaseToolGCC
-            - package: swig/1.3.40+dl.1
-              options:
-                  - pcre:with_bzip2=False
-              configs:
-                - ReleaseTool
-            - package: swig/4.0.2+dl.2
-              options:
-                  - pcre:with_bzip2=False
-              configs:
-                - ReleaseTool
+                  - ReleaseTool
         prebuilt_tools_configs:
             - ReleaseTool
-            - ReleaseToolGCC
 
     sunos:
         common: &sparcCommon
@@ -760,7 +737,7 @@ config:
                 description: Sparc Release
                 profile_host: gcc-9-sparc-solaris
                 env_host:
-                    - PATH=[/opt/cmake-3.19/bin]
+                    - PATH=[/opt/cmake-3.23/bin]
             Debug: &sparcDebug
                 <<: *sparcRelease
                 build_folder: build-debug
@@ -800,12 +777,12 @@ config:
         prebuilt_tools:
             - package: cmake/[~3.24.0]
               options:
-                - cmake:with_openssl=False
+                  - cmake:with_openssl=False
               configs:
                   - ReleaseToolCMake
             - package: cmake/[>=3.23.0]
               options:
-                - cmake:with_openssl=False
+                  - cmake:with_openssl=False
               configs:
                   - ReleaseToolCMake
             - package: doxygen/1.9.1
@@ -853,7 +830,7 @@ merge_upstream:
     # Overrides the defaults in the MergeUpstreamConfig class in tasks/merge_upstream.py
     # Note the use of nested dataclasses; use nested dictionaries here.
     pull_request:
-        reviewers: [ kam, saharay ]
+        reviewers: [kam, saharay]
         assignee: saharay
     # Defaults:
     #    cci:
