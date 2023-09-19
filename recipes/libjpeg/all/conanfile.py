@@ -74,7 +74,7 @@ class LibjpegConan(ConanFile):
             env.define("NODEBUG", None)
             env.vars(self).save_script("conanbuildenv_nmake_unset_env")
             tc = NMakeToolchain(self)
-            tc.extra_defines("--enable-maxmem", 10, "=")
+            tc.extra_defines.append("--enable-maxmem=10")
             tc.generate()
         else:
             env = VirtualBuildEnv(self)
