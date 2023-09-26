@@ -165,6 +165,8 @@ class CMakeConan(ConanFile):
         tc.variables["BUILD_TESTING"] = False
         if not self.settings.compiler.cppstd:
             tc.variables["CMAKE_CXX_STANDARD"] = 11
+        if self.settings.os == "AIX":
+            tc.variables["CURSES_NCURSES_LIBRARY"] = "IGNORE"
         tc.variables["CMAKE_BOOTSTRAP"] = False
         if self.settings.os == "Linux":
             tc.variables["CMAKE_USE_OPENSSL"] = self.options.with_openssl
