@@ -21,10 +21,12 @@ class DoxygenConan(ConanFile):
     options = {
         "enable_parse": [True, False],
         "enable_search": [True, False],
+        "enable_app": [True, False],
     }
     default_options = {
         "enable_parse": True,
         "enable_search": True,
+        "enable_app": False,
     }
 
     @property
@@ -53,6 +55,9 @@ class DoxygenConan(ConanFile):
         if self.options.enable_search:
             self.requires("xapian-core/1.4.19", private=True)
             self.requires("zlib/1.3", private=True)
+        if self.options.enable_app or self.options.enable_parse:
+            # INFO: Doxygen uses upper case CMake variables to link/include IConv, so we are using patches for targets.
+            self.requires("libiconv/1.17")
 
     def package_id(self):
         del self.info.settings.compiler
@@ -81,6 +86,7 @@ class DoxygenConan(ConanFile):
         tc = CMakeToolchain(self)
         tc.variables["build_parse"] = self.options.enable_parse
         tc.variables["build_search"] = self.options.enable_search
+        tc.variables["build_app"] = self.options.enable_app
         tc.variables["use_libc++"] = self.settings.compiler.get_safe("libcxx") == "libc++"
         tc.variables["win_static"] = is_msvc_static_runtime(self)
         tc.generate()
@@ -103,6 +109,8 @@ class DoxygenConan(ConanFile):
         self.cpp_info.set_property("cmake_find_mode", "none")
         self.cpp_info.libdirs = []
         self.cpp_info.includedirs = []
+        if self.settings.os in ["Linux", "FreeBSD"]:
+            self.cpp_info.system_libs = ["pthread", "m"]
 
         # TODO: to remove in conan v2
         self.env_info.PATH.append(os.path.join(self.package_folder, "bin"))
