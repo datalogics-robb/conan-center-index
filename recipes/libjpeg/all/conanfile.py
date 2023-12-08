@@ -5,6 +5,7 @@ from conan.tools.files import apply_conandata_patches, chdir, copy, export_conan
 from conan.tools.gnu import Autotools, AutotoolsToolchain
 from conan.tools.layout import basic_layout
 from conan.tools.microsoft import is_msvc, is_msvc_static_runtime, NMakeToolchain
+from conan.tools.microsoft import check_min_vs, MSBuild, MSBuildToolchain
 import os
 import re
 import shutil
@@ -66,15 +67,21 @@ class LibjpegConan(ConanFile):
         get(self, **self.conan_data["sources"][self.version], strip_root=True)
 
     def generate(self):
-        if is_msvc(self) or self._is_clang_cl:
-            # clean environment variables that might affect on the build (e.g. if set by Jenkins)
-            env = Environment()
-            env.define("PROFILE", None)
-            env.define("TUNE", None)
-            env.define("NODEBUG", None)
-            env.vars(self).save_script("conanbuildenv_nmake_unset_env")
-            tc = NMakeToolchain(self)
-            tc.generate()
+        if is_msvc(self):
+            if check_min_vs(self, '192', raise_invalid=False) and not self._is_clang_cl:
+                self.run('nmake /f makefile.vs setupcopy-v16')
+                tc = MSBuildToolchain(self)
+                # tc.configuration = self._msbuild_configuration
+                tc.generate()
+            else:
+                # clean environment variables that might affect on the build (e.g. if set by Jenkins)
+                env = Environment()
+                env.define("PROFILE", None)
+                env.define("TUNE", None)
+                env.define("NODEBUG", None)
+                env.vars(self).save_script("conanbuildenv_nmake_unset_env")
+                tc = NMakeToolchain(self)
+                tc.generate()
         else:
             env = VirtualBuildEnv(self)
             env.generate()
@@ -118,10 +125,21 @@ class LibjpegConan(ConanFile):
             target = "{}/libjpeg.lib".format("shared" if self.options.shared else "static")
             self.run("nmake -f makefile.vc {} {}".format(" ".join(make_args), target))
 
+    def _build_msbuild(self):
+        self._patch_sources()  # It can be apply_conandata_patches(self) only in case no more patches are needed
+        msbuild = MSBuild(self)
+        msbuild.build_type = self._msbuild_configuration
+        # customize according the solution file and compiler version
+        msbuild.build(sln="jpeg.sln")
+        msbuild.build(sln="apps.sln")
+
     def build(self):
         apply_conandata_patches(self)
-        if is_msvc(self) or self._is_clang_cl:
-            self._build_nmake()
+        if is_msvc(self):
+            if check_min_vs(self, '192', raise_invalid=False) and not self._is_clang_cl:
+              self._build_msbuild()
+            else:
+                self._build_nmake()
         else:
             autotools = Autotools(self)
             autotools.configure()
