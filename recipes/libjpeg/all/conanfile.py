@@ -68,21 +68,19 @@ class LibjpegConan(ConanFile):
 
     def generate(self):
         if is_msvc(self):
+            # clean environment variables that might affect on the build (e.g. if set by Jenkins)
+            env = Environment()
+            env.define("PROFILE", None)
+            env.define("TUNE", None)
+            env.define("NODEBUG", None)
+            env.vars(self).save_script("conanbuildenv_nmake_unset_env")
+            tc = NMakeToolchain(self)
+            tc.generate()
             if check_min_vs(self, '192', raise_invalid=False) and not self._is_clang_cl:
                 self.run('nmake /f makefile.vs setupcopy-v16')
                 tc = MSBuildToolchain(self)
                 # tc.configuration = self._msbuild_configuration
                 tc.generate()
-            else:
-                # clean environment variables that might affect on the build (e.g. if set by Jenkins)
-                env = Environment()
-                env.define("PROFILE", None)
-                env.define("TUNE", None)
-                env.define("NODEBUG", None)
-                env.vars(self).save_script("conanbuildenv_nmake_unset_env")
-                tc = NMakeToolchain(self)
-                tc.generate()
-        else:
             env = VirtualBuildEnv(self)
             env.generate()
             tc = AutotoolsToolchain(self)
