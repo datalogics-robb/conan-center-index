@@ -831,7 +831,7 @@ merge_upstream:
     # Overrides the defaults in the MergeUpstreamConfig class in tasks/merge_upstream.py
     # Note the use of nested dataclasses; use nested dictionaries here.
     pull_request:
-        reviewers: [kam, saharay]
+        reviewers: [saharay]
         assignee: saharay
     # Defaults:
     #    cci:
