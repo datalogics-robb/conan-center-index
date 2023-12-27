@@ -220,9 +220,6 @@ config:
             - package: b2/4.8.2
               configs:
                   - ReleaseTool
-            - package: b2/4.9.3
-              configs:
-                  - ReleaseTool
             - package: b2/4.9.6
               configs:
                   - ReleaseTool
@@ -315,9 +312,6 @@ config:
               configs:
                   - ReleaseTool
             - package: b2/4.8.2
-              configs:
-                  - ReleaseTool
-            - package: b2/4.9.3
               configs:
                   - ReleaseTool
             - package: b2/4.9.6
@@ -420,9 +414,6 @@ config:
             - package: b2/4.8.2
               configs:
                   - ReleaseTool
-            - package: b2/4.9.3
-              configs:
-                  - ReleaseTool
             - package: b2/4.9.6
               configs:
                   - ReleaseTool
@@ -517,9 +508,6 @@ config:
               configs:
                   - ReleaseTool
             - package: b2/4.8.2
-              configs:
-                  - ReleaseTool
-            - package: b2/4.9.3
               configs:
                   - ReleaseTool
             - package: b2/4.9.6
@@ -631,9 +619,6 @@ config:
             - package: b2/4.8.2
               configs:
                   - ReleaseTool
-            - package: b2/4.9.3
-              configs:
-                  - ReleaseTool
             - package: b2/4.9.6
               configs:
                   - ReleaseTool
@@ -712,9 +697,6 @@ config:
               configs:
                   - ReleaseTool
             - package: b2/4.8.2
-              configs:
-                  - ReleaseTool
-            - package: b2/4.9.3
               configs:
                   - ReleaseTool
             - package: b2/4.9.6
@@ -798,9 +780,6 @@ config:
               configs:
                   - ReleaseTool
             - package: b2/4.8.2
-              configs:
-                  - ReleaseTool
-            - package: b2/4.9.3
               configs:
                   - ReleaseTool
             - package: b2/4.9.6
