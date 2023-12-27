@@ -150,6 +150,8 @@ class B2Conan(ConanFile):
             cxxflags += " -arch arm64 -arch x86_64"
 
         if self.options.use_cxx_env:
+            envvars = VirtualBuildEnv(self).vars()
+
             cxx = os.environ.get("CXX")
             if cxx:
                 command += f" --cxx={cxx}"
