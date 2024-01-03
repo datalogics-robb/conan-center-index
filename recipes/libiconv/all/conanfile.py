@@ -124,12 +124,9 @@ class LibiconvConan(ConanFile):
         if self.settings.arch == "x86":
             windres_options_path = os.path.join(self.source_folder, "windows", "windres-options")
             self.output.info("Applying {} resource patch: {}".format(self.settings.arch, windres_options_path))
-            replace_in_file(self, windres_options_path,
-                            '#   PACKAGE_VERSION_SUBMINOR',
-                            '#   PACKAGE_VERSION_SUBMINOR\necho "--target=pe-i386"',
-                            strict=True)
+            replace_in_file(self, windres_options_path, '#   PACKAGE_VERSION_SUBMINOR', '#   PACKAGE_VERSION_SUBMINOR\necho "--target=pe-i386"', strict=True)
 
-    def build(self):
+    def build(self): 
         apply_conandata_patches(self)
         self._apply_resource_patch()
         autotools = Autotools(self)

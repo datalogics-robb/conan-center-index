@@ -217,10 +217,7 @@ config:
             - package: ninja/[>=1.0.0]
               configs:
                   - ReleaseTool
-            - package: b2/4.8.0
-              configs:
-                  - ReleaseTool
-            - package: b2/4.9.3
+            - package: b2/4.8.2
               configs:
                   - ReleaseTool
             - package: b2/4.9.6
@@ -314,10 +311,7 @@ config:
             - package: ninja/[>=1.0.0]
               configs:
                   - ReleaseTool
-            - package: b2/4.8.0
-              configs:
-                  - ReleaseTool
-            - package: b2/4.9.3
+            - package: b2/4.8.2
               configs:
                   - ReleaseTool
             - package: b2/4.9.6
@@ -417,10 +411,7 @@ config:
             - package: ninja/[~1.10.0]
               configs:
                   - ReleaseTool
-            - package: b2/4.8.0
-              configs:
-                  - ReleaseTool
-            - package: b2/4.9.3
+            - package: b2/4.8.2
               configs:
                   - ReleaseTool
             - package: b2/4.9.6
@@ -516,10 +507,7 @@ config:
             - package: ninja/[>=1.0.0]
               configs:
                   - ReleaseTool
-            - package: b2/4.8.0
-              configs:
-                  - ReleaseTool
-            - package: b2/4.9.3
+            - package: b2/4.8.2
               configs:
                   - ReleaseTool
             - package: b2/4.9.6
@@ -628,10 +616,7 @@ config:
             - package: ninja/[>=1.0.0]
               configs:
                   - ReleaseTool
-            - package: b2/4.8.0
-              configs:
-                  - ReleaseTool
-            - package: b2/4.9.3
+            - package: b2/4.8.2
               configs:
                   - ReleaseTool
             - package: b2/4.9.6
@@ -711,10 +696,7 @@ config:
             - package: ninja/[>=1.0.0]
               configs:
                   - ReleaseTool
-            - package: b2/4.8.0
-              configs:
-                  - ReleaseTool
-            - package: b2/4.9.3
+            - package: b2/4.8.2
               configs:
                   - ReleaseTool
             - package: b2/4.9.6
@@ -797,10 +779,7 @@ config:
             - package: ninja/[>=1.0.0]
               configs:
                   - ReleaseTool
-            - package: b2/4.8.0
-              configs:
-                  - ReleaseTool
-            - package: b2/4.9.3
+            - package: b2/4.8.2
               configs:
                   - ReleaseTool
             - package: b2/4.9.6
