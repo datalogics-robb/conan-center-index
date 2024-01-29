@@ -436,6 +436,8 @@ config:
 
     redhat-7-x86_64:
         config: *redhat6Config
+        profile_host:
+            - profiles/cmake-tool
         prebuilt_tools:
             - package: ninja/[>=1.0.0]
               configs:
