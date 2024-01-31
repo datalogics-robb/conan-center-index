@@ -372,7 +372,7 @@ config:
                 description: RedHat Release Tool
                 profile_host:
                     - build-profile-linux-intel
-                    - profiles/cmake-tool
+                    - profiles/cmake-path
             ReleaseToolCMake:
                 <<: *redhatCommon
                 build_folder: build-release-tool
@@ -436,6 +436,8 @@ config:
 
     redhat-7-x86_64:
         config: *redhat6Config
+        profile_host:
+            - profiles/cmake-tool
         prebuilt_tools:
             - package: ninja/[>=1.0.0]
               configs:
