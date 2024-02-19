@@ -162,7 +162,7 @@ class B2Conan(ConanFile):
             cxx_env = envvars.get("CXX")
             if cxx_env:
                 command += f" --cxx={cxx_env}"
-                self._write_project_config(cxx_env)
+                #self._write_project_config(cxx_env)
 
             cxxflags_env = envvars.get("CXXFLAGS")
             if cxxflags_env:
