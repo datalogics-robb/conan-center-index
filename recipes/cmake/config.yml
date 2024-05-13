@@ -31,7 +31,11 @@ versions:
     folder: "combined"
   "3.28.1":
     folder: "combined"
+  "3.28.5":
+    folder: "combined"
   "3.29.0":
     folder: "combined"
   "3.29.2":
+    folder: "combined"
+  "3.29.3":
     folder: "combined"
