@@ -896,3 +896,110 @@ diff -u -N -a -r a/makefile.vc b/makefile.vc
  
  # Template command for compiling .c to .obj
  .c.obj:
+--- a/makefile.vs
++++ b/makefile.vs
+@@ -42,12 +38,12 @@
+         jddctmgr.c jdhuff.c jdinput.c jdmainct.c jdmarker.c jdmaster.c \
+         jdmerge.c jdpostct.c jdsample.c jdtrans.c jerror.c jfdctflt.c \
+         jfdctfst.c jfdctint.c jidctflt.c jidctfst.c jidctint.c jquant1.c \
+-        jquant2.c jutils.c jmemmgr.c
++        jquant2.c jutils.c jmemmgr.c jphotoshop.c iccprofile.c transupp.c
+ # memmgr back ends: compile only one of these into a working library
+ SYSDEPSOURCES= jmemansi.c jmemname.c jmemnobs.c jmemdos.c jmemmac.c
+ # source files: cjpeg/djpeg/jpegtran applications, also rdjpgcom/wrjpgcom
+ APPSOURCES= cjpeg.c djpeg.c jpegtran.c rdjpgcom.c wrjpgcom.c cdjpeg.c \
+-        rdcolmap.c rdswitch.c transupp.c rdppm.c wrppm.c rdgif.c wrgif.c \
++        rdcolmap.c rdswitch.c rdppm.c wrppm.c rdgif.c wrgif.c \
+         rdtarga.c wrtarga.c rdbmp.c wrbmp.c rdrle.c wrrle.c
+ SOURCES= $(LIBSOURCES) $(SYSDEPSOURCES) $(APPSOURCES)
+ # files included by source files
+@@ -82,7 +82,8 @@
+ DISTFILES= $(DOCS) $(MKFILES) $(CONFIGFILES) $(SOURCES) $(INCLUDES) \
+         $(CONFIGUREFILES) $(OTHERFILES) $(TESTFILES)
+ # library object files common to compression and decompression
+-COMOBJECTS= jaricom.obj jcomapi.obj jutils.obj jerror.obj jmemmgr.obj $(SYSDEPMEM)
++COMOBJECTS= jaricom.obj jcomapi.obj jutils.obj jerror.obj jmemmgr.obj $(SYSDEPMEM) \
++        jphotoshop.obj iccprofile.obj transupp.obj
+ # compression library object files
+ CLIBOBJECTS= jcapimin.obj jcapistd.obj jcarith.obj jctrans.obj jcparam.obj \
+         jdatadst.obj jcinit.obj jcmaster.obj jcmarker.obj jcmainct.obj \
+@@ -100,8 +101,8 @@
+ COBJECTS= cjpeg.obj rdppm.obj rdgif.obj rdtarga.obj rdrle.obj rdbmp.obj \
+         rdswitch.obj cdjpeg.obj
+ DOBJECTS= djpeg.obj wrppm.obj wrgif.obj wrtarga.obj wrrle.obj wrbmp.obj \
+         rdcolmap.obj cdjpeg.obj
+-TROBJECTS= jpegtran.obj rdswitch.obj cdjpeg.obj transupp.obj
++TROBJECTS= jpegtran.obj rdswitch.obj cdjpeg.obj
+ 
+ # Template command for compiling .c to .obj
+ .c.obj:
+diff -u -N -a -r a/makejfil.v16 b/makejfil.v16
+--- a/makejfil.v16
++++ b/makejfil.v16
+@@ -42,6 +42,15 @@
+     <ClInclude Include="jversion.h">
+       <Filter>Header Files</Filter>
+     </ClInclude>
++    <ClInclude Include="iccprofile.h">
++      <Filter>Header Files</Filter>
++    </ClInclude>
++    <ClInclude Include="jphotoshop.h">
++      <Filter>Header Files</Filter>
++    </ClInclude>
++    <ClInclude Include="transupp.h">
++      <Filter>Header Files</Filter>
++    </ClInclude>
+   </ItemGroup>
+   <ItemGroup>
+     <ClCompile Include="jaricom.c">
+@@ -182,5 +191,14 @@
+     <ClCompile Include="jutils.c">
+       <Filter>Source Files</Filter>
+     </ClCompile>
++    <ClCompile Include="iccprofile.c">
++      <Filter>Source Files</Filter>
++    </ClCompile>
++    <ClCompile Include="jphotoshop.c">
++      <Filter>Source Files</Filter>
++    </ClCompile>
++    <ClCompile Include="transupp.c">
++      <Filter>Source Files</Filter>
++    </ClCompile>
+   </ItemGroup>
+ </Project>
+diff -u -N -a -r a/makejvcx.v16 b/makejvcx.v16
+--- a/makejvcx.v16
++++ b/makejvcx.v16
+@@ -19,6 +19,7 @@
+     </ProjectConfiguration>
+   </ItemGroup>
+   <ItemGroup>
++    <ClInclude Include="iccprofile.h" />
+     <ClInclude Include="jconfig.h" />
+     <ClInclude Include="jdct.h" />
+     <ClInclude Include="jerror.h" />
+@@ -27,9 +28,12 @@
+     <ClInclude Include="jmorecfg.h" />
+     <ClInclude Include="jpegint.h" />
+     <ClInclude Include="jpeglib.h" />
++    <ClInclude Include="jphotoshop.h" />
+     <ClInclude Include="jversion.h" />
++    <ClInclude Include="transupp.h" />
+   </ItemGroup>
+   <ItemGroup>
++    <ClCompile Include="iccprofile.c" />
+     <ClCompile Include="jaricom.c" />
+     <ClCompile Include="jcapimin.c" />
+     <ClCompile Include="jcapistd.c" />
+@@ -73,9 +77,11 @@
+     <ClCompile Include="jidctint.c" />
+     <ClCompile Include="jmemmgr.c" />
+     <ClCompile Include="jmemnobs.c" />
++    <ClCompile Include="jphotoshop.c" />
+     <ClCompile Include="jquant1.c" />
+     <ClCompile Include="jquant2.c" />
+     <ClCompile Include="jutils.c" />
++    <ClCompile Include="transupp.c" />
+   </ItemGroup>
+   <PropertyGroup Label="Globals">
+     <ProjectGuid>{019DBD2A-273D-4BA4-BF86-B5EFE2ED76B1}</ProjectGuid>
