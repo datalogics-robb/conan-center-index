@@ -532,7 +532,7 @@ config:
             - ReleaseTool
             - ReleaseToolCMake
 
-    windows:
+    windows-x86_64:
         # Can set the generator differently on a per-machine basis (but automatic is
         # better)
         # cmake_generator: Visual Studio 12 2013 Win64
@@ -757,6 +757,84 @@ config:
                   - ReleaseTool
         prebuilt_tools_configs:
             - ReleaseTool
+
+    windows-armv8:
+        config:
+            Release:
+                build_folder: build-release
+                description: Windows Release
+                profile_host: visual-studio-17-arm64
+                build:
+                    - missing
+            Debug: &winArmDebug
+                include: Release
+                build_folder: build-debug
+                description: Windows Debug
+                settings:
+                    - build_type=Debug
+            ReleaseTool:
+                build_folder: build-release-tool
+                description: Windows Release
+                profile_host:
+                    - visual-studio-17-arm64
+            ReleaseToolCMake:
+                build_folder: build-release-tool
+                description: Windows Release
+                profile_host:
+                    - visual-studio-17-arm64
+            DebugTool:
+                build_folder: build-debug-tool
+                description: Windows Debug Tool
+                include:
+                    - ReleaseTool
+                settings:
+                    - build-type=Debug
+            default: *winArmDebug
+        prebuilt_tools:
+            - package: cmake/[>=3.23.0]
+              configs:
+                  - ReleaseToolCMake
+            - package: doxygen/1.9.1
+              configs:
+                  # xapian-core doesn't work for cross-building x86_64 to x86
+                  - ReleaseTool
+            - package: doxygen/1.9.2
+              configs:
+                  # xapian-core doesn't work for cross-building x86_64 to x86
+                  - ReleaseTool
+            - package: doxygen/1.9.1
+              options:
+                  - doxygen:enable_search=False
+              configs:
+                  - ReleaseTool
+            - package: doxygen/1.9.2
+              options:
+                  - doxygen:enable_search=False
+              configs:
+                  - ReleaseTool
+            - package: ninja/[~1.10.0]
+              configs:
+                  - ReleaseTool
+            - package: ninja/[>=1.0.0]
+              configs:
+                  - ReleaseTool
+            - package: b2/4.8.2
+              configs:
+                  - ReleaseTool
+            - package: b2/4.9.6
+              configs:
+                  - ReleaseTool
+            - package: b2/[~4.9]
+              configs:
+                  - ReleaseTool
+            - package: swig/4.0.2+dl.2
+              options:
+                  - pcre:with_bzip2=False
+              configs:
+                  - ReleaseTool
+        prebuilt_tools_configs:
+            - ReleaseTool
+            - ReleaseToolCMake
 
     byhost:
         # Configs based on hostname.

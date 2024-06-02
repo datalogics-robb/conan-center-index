@@ -3,6 +3,7 @@ def ENV_LOC = [:]
 // that uses an earlier glibc, so the tools will run on every machine.
 def BUILD_TOOLS=[
     'aix-conan-center-index': true,
+    'windows-arm-conan-center-index': true,
     'linux-x64-rhws6-conan-center-index': true,
     'linux-x64-rhel7-conan-center-index': true,
     'linux-arm-conan-center-index': true,
@@ -21,6 +22,7 @@ pipeline {
         choice(name: 'PLATFORM_FILTER',
                choices: ['all',
                          'aix-conan-center-index',
+			 'windows-arm-conan-center-index',
                          'linux-x64-rhws6-conan-center-index',
                          'linux-x64-rhel7-conan-center-index',
                          'linux-arm-conan-center-index',
@@ -291,6 +293,7 @@ pipeline {
                     axis {
                         name 'NODE'
                         values 'aix-conan-center-index',
+                            'windows-arm-conan-center-index',
                             'linux-x64-rhws6-conan-center-index',
                             'linux-x64-rhel7-conan-center-index',
                             'linux-arm-conan-center-index',
