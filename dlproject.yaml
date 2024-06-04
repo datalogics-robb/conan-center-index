@@ -758,7 +758,7 @@ config:
         prebuilt_tools_configs:
             - ReleaseTool
 
-    windows-armv8:
+    windows-arm64:
         config:
             Release:
                 build_folder: build-release
