@@ -118,7 +118,7 @@ def tool_recipe_folder(tool_and_config):
 
 @pytest.fixture(scope='package')
 def msys_env(release_tool_config, tmpdir_factory, upload_to):
-    if platform.system() == 'Windows':
+    if platform.system() == 'Windows' and platform.machine().lower() != 'arm64':
         msys2_dir = tmpdir_factory.mktemp('msys2_install')
         install_json = msys2_dir / 'install.json'
         args = ['conan', 'install', '--update', 'msys2/cci.latest@', '-if', msys2_dir, '-g', 'json',
