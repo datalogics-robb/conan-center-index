@@ -655,7 +655,7 @@ config:
                 description: AIX Release
                 profile_host: gcc-10-aix72-64-cppstd-14
                 env_host:
-                    - PATH=[/opt/cmake-3.23/bin]
+                    - PATH+=(path)/opt/cmake-3.28/bin
             Debug: &aixDebug
                 <<: *aixRelease
                 build_folder: build-debug
@@ -670,28 +670,12 @@ config:
                     - gcc-10-aix72-64-cppstd-14
                 profile_build:
                     - gcc-10-aix72-64-cppstd-14
-            ReleaseToolCMake:
-                build_folder: build-release-tool
-                description: AIX CMake Release Tool
-                profile_host:
-                    - gcc-10-aix72-64-cppstd-14
-                    - profiles/bootstrap-cmake-tool
             DebugTool:
                 build_folder: build-debug-tool
                 description: AIX Debug Tool
                 include:
                     - Debug
         prebuilt_tools:
-            - package: cmake/[~3.24.0]
-              options:
-                  - cmake:with_openssl=False
-              configs:
-                  - ReleaseToolCMake
-            - package: cmake/[>=3.23.0]
-              options:
-                  - cmake:with_openssl=False
-              configs:
-                  - ReleaseToolCMake
             - package: ninja/[~1.10.0]
               configs:
                   - ReleaseTool
@@ -709,7 +693,6 @@ config:
                   - ReleaseTool
         prebuilt_tools_configs:
             - ReleaseTool
-            - ReleaseToolCMake
 
     sunos:
         common: &sparcCommon
@@ -722,22 +705,11 @@ config:
                 description: Sparc Release
                 profile_host: gcc-9-sparc-solaris
                 env_host:
-                    - PATH=[/opt/cmake-3.23/bin]
+                    - PATH+=(path)/opt/cmake-3.28/bin
             Debug: &sparcDebug
                 <<: *sparcRelease
                 build_folder: build-debug
                 description: Sparc Debug
-                settings:
-                    - build_type=Debug
-            Release32: &sparcRelease32
-                <<: *sparcRelease
-                build_folder: build-release-32
-                description: Sparc Release 32
-                profile_host: gcc-9-sparc32-solaris
-            Debug32: &sparcDebug32
-                <<: *sparcRelease32
-                build_folder: build-debug-32
-                description: Sparc Debug 32
                 settings:
                     - build_type=Debug
             ReleaseTool:
@@ -745,13 +717,6 @@ config:
                 description: Sparc Release Tool
                 profile_host:
                     - build-profile-solaris-sparc
-                    - profiles/cmake-tool
-            ReleaseToolCMake:
-                build_folder: build-release-tool
-                description: Sparc Release Tool
-                profile_host:
-                    - build-profile-solaris-sparc
-                    - profiles/bootstrap-cmake-tool
             DebugTool:
                 build_folder: build-debug-tool
                 description: Sparc Debug Tool
@@ -760,16 +725,6 @@ config:
                 settings:
                     - build_type=Debug
         prebuilt_tools:
-            - package: cmake/[~3.24.0]
-              options:
-                  - cmake:with_openssl=False
-              configs:
-                  - ReleaseToolCMake
-            - package: cmake/[>=3.23.0]
-              options:
-                  - cmake:with_openssl=False
-              configs:
-                  - ReleaseToolCMake
             - package: doxygen/1.9.1
               options:
                   - doxygen:enable_search=False
@@ -802,7 +757,6 @@ config:
                   - ReleaseTool
         prebuilt_tools_configs:
             - ReleaseTool
-            - ReleaseToolCMake
 
     byhost:
         # Configs based on hostname.
