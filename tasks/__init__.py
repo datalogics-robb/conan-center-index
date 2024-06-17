@@ -42,7 +42,9 @@ def upload_recipes(ctx, remote='conan-center-dl-staging', package=None, all=Fals
         stm = io.StringIO()
         ctx.run(f'git diff --name-only {since_commit} -- recipes', out_stream=stm, pty=False, dry=False)
         lines = stm.getvalue().strip('\n').split('\n')
-        packages.update(path.split('/')[1] for path in lines if path)
+        # Include the recipe if the diff mentions a file and that file still exists.
+        # This avoids trying to do uploads for files that have been deleted.
+        packages.update(path.split('/')[1] for path in lines if path and os.path.exists(path))
 
     def search_branch_merge():
         # Get all revs from branch
