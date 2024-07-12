@@ -188,8 +188,7 @@ class LeptonicaConan(ConanFile):
         if Version(self.version) < "1.83.0":
             # versions below 1.83.0 do not have an option toggle
             replace_in_file(self, cmakelists, "if(NOT WEBP)", "if(0)")
-            if Version(self.version) >= "1.79.0":
-                replace_in_file(self, cmakelists, "if(NOT WEBPMUX)", "if(0)")
+            replace_in_file(self, cmakelists, "if(NOT WEBPMUX)", "if(0)")
             if not self.options.with_webp:
                 replace_in_file(self, cmakelists_src, "if (WEBP_FOUND)", "if(0)")
                 replace_in_file(self, cmake_configure, "if (WEBP_FOUND)", "if(0)")
@@ -199,13 +198,7 @@ class LeptonicaConan(ConanFile):
                                 "if (WEBP_FOUND)\n"
                                 "target_link_directories(leptonica PRIVATE ${WEBP_LIBRARY_DIRS} ${WEBPMUX_LIBRARY_DIRS})\n"
                                 "target_compile_definitions(leptonica PRIVATE ${WEBP_CFLAGS_OTHER} ${WEBPMUX_CFLAGS_OTHER})")
-
         replace_in_file(self, cmakelists_src, "${WEBP_LIBRARIES}", "${WEBP_LIBRARIES} ${WEBPMUX_LIBRARIES}")
-        if Version(self.version) >= "1.79.0":
-            replace_in_file(self, cmakelists, "if(NOT WEBPMUX)", "if(0)")
-        if not self.options.with_webp:
-            replace_in_file(self, cmakelists_src, "if (WEBP_FOUND)", "if(0)")
-            replace_in_file(self, cmake_configure, "if (WEBP_FOUND)", "if(0)")
 
         # Remove detection of fmemopen() on macOS < 10.13
         # CheckFunctionExists will find it in the link library.
