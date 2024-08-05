@@ -763,7 +763,10 @@ config:
             Release:
                 build_folder: build-release
                 description: Windows Release
-                profile_host: visual-studio-17-arm64
+                profile_host: visual-studio-17-arm64-cppstd-14
+                profile_build:
+                  - win-arm64-wsl
+                  - visual-studio-17-arm64-cppstd-17
                 build:
                     - missing
             Debug: &winArmDebug
@@ -818,7 +821,7 @@ config:
             - package: ninja/[>=1.0.0]
               configs:
                   - ReleaseTool
-            - package: b2/4.8.2
+            - package: automake/1.16.5
               configs:
                   - ReleaseTool
             - package: b2/4.9.6
