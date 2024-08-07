@@ -1,7 +1,6 @@
 tox
 dl-conan-build-tools~=3.4
 node-semver
-coverage
 flake8
 flake8-printf-formatting
 pipdeptree
