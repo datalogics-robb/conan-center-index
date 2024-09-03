@@ -165,7 +165,7 @@ config:
                 build_folder: build-release
                 description: macOS Release
                 profile_host:
-                    - apple-clang-14.0-intel-cppstd-14
+                    - apple-clang-15.0-intel-cppstd-14
             Debug: &macOSDebug
                 <<: *macOSRelease
                 build_folder: build
@@ -259,7 +259,7 @@ config:
                 build_folder: build-release
                 description: macOS Release
                 profile_host:
-                    - apple-clang-14.0-arm-cppstd-14
+                    - apple-clang-15.0-arm-cppstd-14
             Debug:
                 <<: *macOSRelease
                 build_folder: build
