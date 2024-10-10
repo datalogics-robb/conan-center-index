@@ -11,8 +11,8 @@ To use the Curated Conan Center Index Conan repositories, add the following
 repositories to Conan, and disable the one not currently in use:
 
 ```text
-conan-center-dl: http://artifactory.dlogics.com:8081/artifactory/api/conan/conan-center-dl [Verify SSL: True, Disabled: True]
-conan-center-dl-staging: http://artifactory.dlogics.com:8081/artifactory/api/conan/conan-center-dl-staging [Verify SSL: True]
+conan-center-dl: https://datalogics.jfrog.io/artifactory/api/conan/conan-center-dl [Verify SSL: True, Disabled: True]
+conan-center-dl-staging: https://datalogics.jfrog.io/artifactory/api/conan/conan-center-dl-staging [Verify SSL: True]
 ```
 
 The best way to do this is to add the repositories to `remotes.txt` in a Conan
@@ -20,11 +20,11 @@ configuration repo, which is already done in the `curated-conan-center-index`
 branch of the `conan-config` Git repository:
 
 ```text
-conan-local http://artifactory.dlogics.com:8081/artifactory/api/conan/conan-local True
-conan-alias-production http://artifactory.dlogics.com:8081/artifactory/api/conan/conan-alias-production True
-conan-alias-staging http://artifactory.dlogics.com:8081/artifactory/api/conan/conan-alias-staging True
-conan-center-dl http://artifactory.dlogics.com:8081/artifactory/api/conan/conan-center-dl True
-conan-center-dl-staging http://artifactory.dlogics.com:8081/artifactory/api/conan/conan-center-dl-staging True
+conan-local https://datalogics.jfrog.io/artifactory/api/conan/conan-local True
+conan-alias-production https://datalogics.jfrog.io/artifactory/api/conan/conan-alias-production True
+conan-alias-staging https://datalogics.jfrog.io/artifactory/api/conan/conan-alias-staging True
+conan-center-dl https://datalogics.jfrog.io/artifactory/api/conan/conan-center-dl True
+conan-center-dl-staging https://datalogics.jfrog.io/artifactory/api/conan/conan-center-dl-staging True
 ```
 
 Add the `curated-conan-center-index` to your `dlconfig.yaml` by adding

@@ -74,6 +74,8 @@ pipeline {
         CONAN_USER_HOME = "${WORKSPACE}"
         CONAN_NON_INTERACTIVE = '1'
         CONAN_PRINT_RUN_COMMANDS = '1'
+        CONAN_LOGIN_USERNAME='devauto'
+        CONAN_PASSWORD=credentials('jfrog-dev-token')
         // Disable FileTracker on Windows, which can give FTK1011 on long path names
         TRACKFILEACCESS = 'false'
         // Disable node reuse, which gives intermittent build errors on Windows

@@ -1,5 +1,5 @@
 tox
-dl-conan-build-tools~=3.4
+dl-conan-build-tools
 node-semver
 flake8
 flake8-printf-formatting
