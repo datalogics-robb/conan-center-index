@@ -149,8 +149,7 @@ class LibjpegConan(ConanFile):
     def package(self):
         copy(self, "README", src=self.source_folder, dst=os.path.join(self.package_folder, "licenses"))
         if self._is_cl_like:
-            for filename in ["jpeglib.h", "jerror.h", "jconfig.h", "jmorecfg.h"]:
-                copy(self, filename, src=self.source_folder, dst=os.path.join(self.package_folder, "include"), keep_path=False)
+            copy(self, '*.h', src=self.source_folder, dst=os.path.join(self.package_folder, "include"), keep_path=False)
 
             copy(self, "*.lib", src=self.source_folder, dst=os.path.join(self.package_folder, "lib"), keep_path=False)
             if self.options.shared:
