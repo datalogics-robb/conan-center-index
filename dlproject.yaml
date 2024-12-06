@@ -165,7 +165,7 @@ config:
                 build_folder: build-release
                 description: macOS Release
                 profile_host:
-                    - apple-clang-13.0-intel-cppstd-14
+                    - apple-clang-13.0-intel-cppstd-17
             Debug: &macOSDebug
                 <<: *macOSRelease
                 build_folder: build
@@ -268,7 +268,7 @@ config:
                 build_folder: build-release
                 description: macOS Release
                 profile_host:
-                    - apple-clang-13.0-arm-cppstd-14
+                    - apple-clang-13.0-arm-cppstd-17
             Debug:
                 <<: *macOSRelease
                 build_folder: build
@@ -363,7 +363,7 @@ config:
                 build_folder: build-release
                 description: RedHat Release
                 profile_host:
-                    - llvm-toolset-7-cppstd-14
+                    - llvm-toolset-7-cppstd-17
             Debug: &redhatDebug
                 <<: *redhatRelease
                 build_folder: build-debug
@@ -375,7 +375,7 @@ config:
                 build_folder: build-release-32
                 description: RedHat Release 32
                 profile_host:
-                    - llvm-toolset-7-cppstd-14
+                    - llvm-toolset-7-cppstd-17
                 settings:
                     - arch=x86
             Debug32: &redhatDebug32
@@ -567,7 +567,7 @@ config:
             Release:
                 build_folder: build-release
                 description: Windows Release
-                profile_host: visual-studio-16
+                profile_host: visual-studio-16-cppstd-17
                 settings:
                     compiler.toolset=v141
                 build:
