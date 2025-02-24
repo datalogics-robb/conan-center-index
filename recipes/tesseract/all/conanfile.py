@@ -69,7 +69,7 @@ class TesseractConan(ConanFile):
         self.requires("leptonica/1.82.0")
         # libarchive is required for 4.x so default value is true
         if self.options.get_safe("with_libarchive", default=True):
-            self.requires("libarchive/3.6.1")
+            self.requires("libarchive/[>=3.7 <3.8]")
         # libcurl is not required for 4.x
         if self.options.get_safe("with_libcurl", default=False):
             self.requires("libcurl/7.84.0")
